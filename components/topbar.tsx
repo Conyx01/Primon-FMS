@@ -3,6 +3,7 @@
 import { Bell } from "lucide-react";
 import { useDemo } from "@/lib/store";
 import { currentUser } from "@/lib/mock-data";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 
 export function Topbar({
   title,
@@ -13,9 +14,11 @@ export function Topbar({
   description?: string;
   action?: React.ReactNode;
 }) {
-  const { role, workOrders } = useDemo();
-  const user =
-    currentUser[role as keyof typeof currentUser] ?? currentUser.ops_manager;
+  const { workOrders } = useDemo();
+  const { user, role, isLoading } = useCurrentUser();
+  
+  const displayUser = user || currentUser.ops_manager; // Fallback while loading
+  const displayRole = role || 'ops_manager';
   const flagged = workOrders.filter((w) => w.status === "flagged").length;
 
   return (
@@ -37,11 +40,11 @@ export function Topbar({
         </button>
         <div className="flex items-center gap-2.5 rounded-full border border-border bg-white py-1 pl-1 pr-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primon-800 text-xs font-medium text-white">
-            {user.initials}
+            {displayUser.name?.charAt(0).toUpperCase() || 'U'}
           </span>
           <div className="hidden text-left sm:block">
-            <p className="text-xs font-medium leading-tight text-ink">{user.name}</p>
-            <p className="text-[11px] leading-tight text-muted">{user.role}</p>
+            <p className="text-xs font-medium leading-tight text-ink">{displayUser.name}</p>
+            <p className="text-[11px] leading-tight text-muted">{displayRole}</p>
           </div>
         </div>
       </div>

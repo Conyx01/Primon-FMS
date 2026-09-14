@@ -5,57 +5,71 @@ import { useState } from "react";
 import { PrimonLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Label, TextInput } from "@/components/ui/input";
-import { useDemo } from "@/lib/store";
-import { DemoRole } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { HardHat, ShieldCheck, UserCog, Building2 } from "lucide-react";
-
-const roleOptions: {
-  id: DemoRole;
-  label: string;
-  desc: string;
-  icon: typeof HardHat;
-  goesTo: string;
-}[] = [
-    {
-      id: "ops_manager",
-      label: "Operations Manager",
-      desc: "Complete certificates, review flags",
-      icon: ShieldCheck,
-      goesTo: "/dashboard",
-    },
-    {
-      id: "admin",
-      label: "Admin",
-      desc: "Full access, plus stock oversight",
-      icon: UserCog,
-      goesTo: "/dashboard",
-    },
-    {
-      id: "supervisor",
-      label: "Fumigation Supervisor",
-      desc: "Log daily gas readings on site",
-      icon: HardHat,
-      goesTo: "/dashboard/monitor",
-    },
-    {
-      id: "client",
-      label: "Client",
-      desc: "Track and download your certificate",
-      icon: Building2,
-      goesTo: "/portal",
-    },
-  ];
+import { authClient } from "@/lib/auth/client";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const [selected, setSelected] = useState<DemoRole>("ops_manager");
-  const { setRole } = useDemo();
   const router = useRouter();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSignIn() {
-    setRole(selected);
-    const target = roleOptions.find((r) => r.id === selected)?.goesTo ?? "/dashboard";
-    router.push(target);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (isSignUp) {
+        const { error: signUpError } = await authClient.signUp.email({
+          email,
+          password,
+          name,
+        });
+        if (signUpError) {
+          setError(signUpError.message || "Failed to sign up");
+          setLoading(false);
+          return;
+        }
+      } else {
+        const { error: signInError } = await authClient.signIn.email({
+          email,
+          password,
+        });
+        if (signInError) {
+          setError(signInError.message || "Invalid credentials");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Sync user to database
+      const syncRes = await fetch('/api/auth/sync', { method: 'POST' });
+      if (!syncRes.ok) {
+        console.error("Failed to sync user to database");
+      }
+
+      // Fetch user role to route correctly
+      const meRes = await fetch('/api/auth/me');
+      if (meRes.ok) {
+        const user = await meRes.json();
+        if (user.role === 'client') {
+          router.push('/portal');
+        } else if (user.role === 'supervisor') {
+          router.push('/dashboard/monitor');
+        } else {
+          router.push('/dashboard');
+        }
+      } else {
+        router.push('/dashboard');
+      }
+    } catch (err) {
+      setError("An unexpected error occurred");
+      setLoading(false);
+    }
   }
 
   return (
@@ -79,61 +93,78 @@ export default function LoginPage() {
           <div className="mb-10 lg:hidden">
             <PrimonLogo width={170} />
           </div>
-          <p className="text-sm text-brass-600">Welcome back</p>
-          <h1 className="mt-1 font-display text-3xl text-primon-950">Sign in to Primon FMS</h1>
+          <p className="text-sm text-brass-600">Welcome to Primon FMS</p>
+          <h1 className="mt-1 font-display text-3xl text-primon-950">
+            {isSignUp ? "Create an account" : "Sign in to your account"}
+          </h1>
           <p className="mt-2 text-sm text-muted">
-            This is a demonstration build — choose a role below to preview that
-            person's view of the system.
+            {isSignUp
+              ? "Enter your details to create your account."
+              : "Enter your email and password to access the system."}
           </p>
 
-          <div className="mt-8 space-y-2.5">
-            {roleOptions.map((r) => {
-              const Icon = r.icon;
-              const active = selected === r.id;
-              return (
-                <button
-                  key={r.id}
-                  onClick={() => setSelected(r.id)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors",
-                    active
-                      ? "border-primon-800 bg-primon-50"
-                      : "border-border bg-white hover:border-primon-200"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                      active ? "bg-primon-800 text-white" : "bg-primon-50 text-primon-700"
-                    )}
-                  >
-                    <Icon className="h-4.5 w-4.5" strokeWidth={1.75} />
-                  </span>
-                  <span>
-                    <span className="block text-sm font-medium text-primon-950">
-                      {r.label}
-                    </span>
-                    <span className="block text-xs text-muted">{r.desc}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-8 space-y-3.5 border-t border-border pt-6">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            {error && (
+              <div className="rounded-lg bg-status-critical/10 p-3 text-sm text-status-critical">
+                {error}
+              </div>
+            )}
+            
+            {isSignUp && (
+              <div>
+                <Label htmlFor="name">Full Name</Label>
+                <TextInput
+                  id="name"
+                  type="text"
+                  placeholder="Jane Doe"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required={isSignUp}
+                />
+              </div>
+            )}
             <div>
-              <Label>Email</Label>
-              <TextInput defaultValue="demo@primon.mw" disabled />
+              <Label htmlFor="email">Email address</Label>
+              <TextInput
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
             <div>
-              <Label>Password</Label>
-              <TextInput type="password" defaultValue="••••••••••" disabled />
+              <Label htmlFor="password">Password</Label>
+              <TextInput
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
-          </div>
 
-          <Button size="lg" className="mt-6 w-full" onClick={handleSignIn}>
-            Sign in as {roleOptions.find((r) => r.id === selected)?.label}
-          </Button>
+            <Button size="lg" className="mt-6 w-full" type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSignUp ? "Sign up" : "Sign in"}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-muted">
+            {isSignUp ? "Already have an account? " : "Don't have an account? "}
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError(null);
+              }}
+              className="font-medium text-primon-800 hover:underline"
+            >
+              {isSignUp ? "Sign in" : "Sign up"}
+            </button>
+          </div>
         </div>
       </section>
     </main>

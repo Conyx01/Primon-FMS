@@ -6,8 +6,6 @@ import { mockStock, mockWorkOrders } from "./mock-data";
 import { DemoRole, StockFormulation, WorkOrder } from "./types";
 
 interface DemoStore {
-  role: DemoRole;
-  setRole: (r: DemoRole) => void;
   workOrders: WorkOrder[];
   addWorkOrder: (wo: WorkOrder) => void;
   updateWorkOrder: (id: string, patch: Partial<WorkOrder>) => void;
@@ -19,10 +17,6 @@ interface DemoStore {
 const DemoContext = createContext<DemoStore | null>(null);
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRole, roleHydrated] = useLocalStorage<DemoRole>(
-    "primon-demo-role",
-    "ops_manager"
-  );
   const [workOrders, setWorkOrders, woHydrated] = useLocalStorage<WorkOrder[]>(
     "primon-demo-work-orders",
     mockWorkOrders
@@ -50,16 +44,14 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      role,
-      setRole,
       workOrders,
       addWorkOrder,
       updateWorkOrder,
       stock,
       adjustStock,
-      hydrated: roleHydrated && woHydrated && stockHydrated,
+      hydrated: woHydrated && stockHydrated,
     }),
-    [role, workOrders, stock, roleHydrated, woHydrated, stockHydrated]
+    [workOrders, stock, woHydrated, stockHydrated]
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
