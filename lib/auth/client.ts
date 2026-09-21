@@ -1,5 +1,7 @@
-import { createAuthClient } from 'better-auth/react';
+import { createAuthClient } from "better-auth/react";
+import { inferAdditionalFields } from "better-auth/client/plugins";
+import type { auth } from "./server";
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_NEON_AUTH_BASE_URL || process.env.NEON_AUTH_BASE_URL || '',
+  plugins: [inferAdditionalFields<typeof auth>()],
 });

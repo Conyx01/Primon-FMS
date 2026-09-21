@@ -5,57 +5,110 @@ import { resolve } from 'path'
 config({ path: resolve(process.cwd(), '.env.local') })
 config({ path: resolve(process.cwd(), '.env') }) // fallback
 
-import { PrismaClient, Role, WorkOrderSource, CropType, Scale, FccStatus, FumigationType, ReadingStatus, SignatureRole } from '@prisma/client'
+import { PrismaClient, CropType, Role, WorkOrderSource, Scale, FccStatus, FumigationType, ReadingStatus, SignatureRole } from '@prisma/client'
+import { hashPassword } from 'better-auth/crypto'
 
 const prisma = new PrismaClient()
+
+// Default dev passwords — change these before any staging/production seed
+const DEFAULT_PASSWORD = 'Primon@2026!'
+const ADMIN_PASSWORD = 'Admin@Primon2026!'
 
 async function main() {
   console.log('🌱 Starting Primon FMS database seeding...')
 
-  // 1. Seed Reference Users
-  const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@primon.mw' },
-    update: {},
-    create: {
+  // ─────────────────────────────────────────────
+  // 1. Seed Reference Users (with better-auth Account records)
+  // ─────────────────────────────────────────────
+
+  const usersToSeed = [
+    {
+      id: 'seed-user-admin',
       name: 'System Admin',
       email: 'admin@primon.mw',
       role: Role.admin,
+      password: ADMIN_PASSWORD,
     },
-  })
-
-  const opsManager = await prisma.user.upsert({
-    where: { email: 'grace.phiri@primon.mw' },
-    update: {},
-    create: {
+    {
+      id: 'seed-user-ops',
       name: 'Grace Phiri',
       email: 'grace.phiri@primon.mw',
       role: Role.ops_manager,
+      password: DEFAULT_PASSWORD,
     },
-  })
-
-  const supervisor = await prisma.user.upsert({
-    where: { email: 'john.banda@primon.mw' },
-    update: {},
-    create: {
+    {
+      id: 'seed-user-supervisor',
       name: 'John Banda',
       email: 'john.banda@primon.mw',
       role: Role.supervisor,
+      password: DEFAULT_PASSWORD,
     },
-  })
-
-  const clientUser = await prisma.user.upsert({
-    where: { email: 'shipping@allianceone.mw' },
-    update: {},
-    create: {
+    {
+      id: 'seed-user-client',
       name: 'Alliance One Tobacco Malawi',
       email: 'shipping@allianceone.mw',
       role: Role.client,
+      password: DEFAULT_PASSWORD,
     },
-  })
+  ]
 
-  console.log('✅ Seeded users (Admin, Ops Manager, Supervisor, Client)')
+  for (const u of usersToSeed) {
+    const now = new Date()
+    const hashedPw = await hashPassword(u.password)
 
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      update: { name: u.name, role: u.role, updatedAt: now },
+      create: {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        emailVerified: true,
+        role: u.role,
+        createdAt: now,
+        updatedAt: now,
+      },
+    })
+
+    const existingAccount = await prisma.account.findFirst({
+      where: { userId: user.id, providerId: 'credential' },
+    })
+
+    if (existingAccount) {
+      await prisma.account.update({
+        where: { id: existingAccount.id },
+        data: {
+          accountId: user.id,
+          password: hashedPw,
+          updatedAt: now,
+        },
+      })
+    } else {
+      await prisma.account.create({
+        data: {
+          accountId: user.id,
+          providerId: 'credential',
+          userId: user.id,
+          password: hashedPw,
+          createdAt: now,
+          updatedAt: now,
+        },
+      })
+    }
+
+    console.log(`  ✔ ${u.role}: ${u.email}`)
+  }
+
+  console.log('✅ Seeded users with better-auth credential accounts')
+
+  const opsManager = await prisma.user.findUniqueOrThrow({ where: { email: 'grace.phiri@primon.mw' } })
+  const supervisor = await prisma.user.findUniqueOrThrow({ where: { email: 'john.banda@primon.mw' } })
+  const clientUser = await prisma.user.findUniqueOrThrow({ where: { email: 'shipping@allianceone.mw' } })
+
+  // ─────────────────────────────────────────────
   // 2. Seed Fumigants & Formulations
+  // ─────────────────────────────────────────────
+
   const aluminiumPhosphide = await prisma.fumigant.upsert({
     where: { name: 'aluminium_phosphide' },
     update: {},
@@ -106,40 +159,34 @@ async function main() {
 
   console.log('✅ Seeded fumigants and formulations')
 
+  // ─────────────────────────────────────────────
   // 3. Seed Stock Levels
+  // ─────────────────────────────────────────────
+
   await prisma.stockLevel.upsert({
     where: { formulationId: sachet11g.id },
     update: {},
-    create: {
-      formulationId: sachet11g.id,
-      quantityOnHand: 5000,
-      lowStockThreshold: 500,
-    },
+    create: { formulationId: sachet11g.id, quantityOnHand: 5000, lowStockThreshold: 500 },
   })
 
   await prisma.stockLevel.upsert({
     where: { formulationId: tablet1g.id },
     update: {},
-    create: {
-      formulationId: tablet1g.id,
-      quantityOnHand: 12000,
-      lowStockThreshold: 1000,
-    },
+    create: { formulationId: tablet1g.id, quantityOnHand: 12000, lowStockThreshold: 1000 },
   })
 
   await prisma.stockLevel.upsert({
     where: { formulationId: plate33g.id },
     update: {},
-    create: {
-      formulationId: plate33g.id,
-      quantityOnHand: 2500,
-      lowStockThreshold: 300,
-    },
+    create: { formulationId: plate33g.id, quantityOnHand: 2500, lowStockThreshold: 300 },
   })
 
   console.log('✅ Seeded stock levels')
 
-  // 4. Optional Dev Sample FCC (FCC-2026-000512 / Alliance One)
+  // ─────────────────────────────────────────────
+  // 4. Seed Dev Sample Work Order + FCC (Alliance One)
+  // ─────────────────────────────────────────────
+
   const workOrder = await prisma.workOrder.upsert({
     where: { code: 'WO-2026-000512' },
     update: {},
@@ -213,35 +260,47 @@ async function main() {
     },
   })
 
-  // Seed sample 6-day gas readings for dev sample FCC
-  const sampleReadings = [
-    { dayNumber: 1, airspacePpm: 950, probeCasePpm: 910, status: ReadingStatus.compliant },
-    { dayNumber: 2, airspacePpm: 880, probeCasePpm: 860, status: ReadingStatus.compliant },
-    { dayNumber: 3, airspacePpm: 810, probeCasePpm: 790, status: ReadingStatus.compliant },
-    { dayNumber: 4, airspacePpm: 750, probeCasePpm: 720, status: ReadingStatus.compliant },
-    { dayNumber: 5, airspacePpm: 680, probeCasePpm: 660, status: ReadingStatus.compliant },
-    { dayNumber: 6, airspacePpm: 630, probeCasePpm: 610, status: ReadingStatus.compliant },
-  ]
+  // 6-day gas readings (idempotent — skip if already present)
+  const existingReadings = await prisma.gasReading.count({ where: { fccId: fcc.id } })
+  if (existingReadings === 0) {
+    const sampleReadings = [
+      { dayNumber: 1, airspacePpm: 950, probeCasePpm: 910, status: ReadingStatus.compliant },
+      { dayNumber: 2, airspacePpm: 880, probeCasePpm: 860, status: ReadingStatus.compliant },
+      { dayNumber: 3, airspacePpm: 810, probeCasePpm: 790, status: ReadingStatus.compliant },
+      { dayNumber: 4, airspacePpm: 750, probeCasePpm: 720, status: ReadingStatus.compliant },
+      { dayNumber: 5, airspacePpm: 680, probeCasePpm: 660, status: ReadingStatus.compliant },
+      { dayNumber: 6, airspacePpm: 630, probeCasePpm: 610, status: ReadingStatus.compliant },
+    ]
 
-  for (const reading of sampleReadings) {
-    const readingDate = new Date('2026-09-01T08:00:00Z')
-    readingDate.setDate(readingDate.getDate() + (reading.dayNumber - 1))
+    for (const reading of sampleReadings) {
+      const readingDate = new Date('2026-09-01T08:00:00Z')
+      readingDate.setDate(readingDate.getDate() + (reading.dayNumber - 1))
 
-    await prisma.gasReading.create({
-      data: {
-        fccId: fcc.id,
-        dayNumber: reading.dayNumber,
-        readingDate,
-        airspacePpm: reading.airspacePpm,
-        probeCasePpm: reading.probeCasePpm,
-        status: reading.status,
-        enteredById: supervisor.id,
-      },
-    })
+      await prisma.gasReading.create({
+        data: {
+          fccId: fcc.id,
+          dayNumber: reading.dayNumber,
+          readingDate,
+          airspacePpm: reading.airspacePpm,
+          probeCasePpm: reading.probeCasePpm,
+          status: reading.status,
+          enteredById: supervisor.id,
+        },
+      })
+    }
+    console.log('✅ Seeded sample FCC-2026-000512 with 6-day gas readings')
+  } else {
+    console.log('ℹ️  Gas readings already exist for FCC-2026-000512, skipping')
   }
 
-  console.log('✅ Seeded sample FCC-2026-000512 with 6-day readings')
+  console.log('')
   console.log('🎉 Seeding completed successfully!')
+  console.log('')
+  console.log('📋 Dev login credentials:')
+  console.log(`   admin@primon.mw          → ${ADMIN_PASSWORD}`)
+  console.log(`   grace.phiri@primon.mw    → ${DEFAULT_PASSWORD}`)
+  console.log(`   john.banda@primon.mw     → ${DEFAULT_PASSWORD}`)
+  console.log(`   shipping@allianceone.mw  → ${DEFAULT_PASSWORD}`)
 }
 
 main()

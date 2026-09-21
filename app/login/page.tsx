@@ -10,10 +10,8 @@ import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,49 +21,28 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      if (isSignUp) {
-        const { error: signUpError } = await authClient.signUp.email({
-          email,
-          password,
-          name,
-        });
-        if (signUpError) {
-          setError(signUpError.message || "Failed to sign up");
-          setLoading(false);
-          return;
-        }
-      } else {
-        const { error: signInError } = await authClient.signIn.email({
-          email,
-          password,
-        });
-        if (signInError) {
-          setError(signInError.message || "Invalid credentials");
-          setLoading(false);
-          return;
-        }
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError(signInError.message || "Invalid credentials");
+        setLoading(false);
+        return;
       }
 
-      // Sync user to database
-      const syncRes = await fetch('/api/auth/sync', { method: 'POST' });
-      if (!syncRes.ok) {
-        console.error("Failed to sync user to database");
+      const session = await authClient.getSession();
+      const role = session?.data?.user?.role;
+
+      if (role === "client") {
+        router.push("/portal");
+      } else if (role === "supervisor") {
+        router.push("/dashboard/monitor");
+      } else {
+        router.push("/dashboard");
       }
 
-      // Fetch user role to route correctly
-      const meRes = await fetch('/api/auth/me');
-      if (meRes.ok) {
-        const user = await meRes.json();
-        if (user.role === 'client') {
-          router.push('/portal');
-        } else if (user.role === 'supervisor') {
-          router.push('/dashboard/monitor');
-        } else {
-          router.push('/dashboard');
-        }
-      } else {
-        router.push('/dashboard');
-      }
     } catch (err) {
       setError("An unexpected error occurred");
       setLoading(false);
@@ -95,12 +72,10 @@ export default function LoginPage() {
           </div>
           <p className="text-sm text-brass-600">Welcome to Primon FMS</p>
           <h1 className="mt-1 font-display text-3xl text-primon-950">
-            {isSignUp ? "Create an account" : "Sign in to your account"}
+            Sign in to your account
           </h1>
           <p className="mt-2 text-sm text-muted">
-            {isSignUp
-              ? "Enter your details to create your account."
-              : "Enter your email and password to access the system."}
+            Enter your email and password to access the system.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -110,19 +85,6 @@ export default function LoginPage() {
               </div>
             )}
             
-            {isSignUp && (
-              <div>
-                <Label htmlFor="name">Full Name</Label>
-                <TextInput
-                  id="name"
-                  type="text"
-                  placeholder="Jane Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required={isSignUp}
-                />
-              </div>
-            )}
             <div>
               <Label htmlFor="email">Email address</Label>
               <TextInput
@@ -148,23 +110,9 @@ export default function LoginPage() {
 
             <Button size="lg" className="mt-6 w-full" type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? "Sign up" : "Sign in"}
+              Sign in
             </Button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-muted">
-            {isSignUp ? "Already have an account? " : "Don't have an account? "}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError(null);
-              }}
-              className="font-medium text-primon-800 hover:underline"
-            >
-              {isSignUp ? "Sign in" : "Sign up"}
-            </button>
-          </div>
         </div>
       </section>
     </main>

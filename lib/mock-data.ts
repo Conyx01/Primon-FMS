@@ -327,9 +327,3 @@ export const mockPendingSubmissions = [
   },
 ];
 
-export const currentUser = {
-  ops_manager: { name: "Grace Phiri", role: "Operations Manager", initials: "GP" },
-  admin: { name: "Chikondi Mvula", role: "Admin", initials: "CM" },
-  supervisor: { name: "Prince Chiwalo", role: "Fumigation Supervisor", initials: "PC" },
-  client: { name: "Hopeson Majiga", role: "Alliance One Tobacco Malawi", initials: "HM" },
-};

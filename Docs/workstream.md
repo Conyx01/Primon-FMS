@@ -18,11 +18,11 @@ This file combines the planned development roadmap and the reactive work log (fi
 - [x] 1.7 Optional local-only seed of the reviewed sample FCC (`FCC-2026-000512` / Alliance One) on a non-production Neon branch so UI work has a realistic row. Do not seed production.
 
 ### 2.0 Authentication & Role-Based Access (generated against SDD v1.0)
-> Must land before any mutating API in 3.0+. The current `/login` role cards and `RoleSwitcher` are demo controls, not Neon Auth.
-- [ ] 2.1 Integrate Neon Auth and mount its handlers under `app/api/auth/**` as specified in SDD §A.5.
-- [ ] 2.2 Persist application `users` (id, name, email, role, createdAt) against Auth identities. Role enum: `supervisor` | `ops_manager` | `admin` | `client` | `executive`.
-- [ ] 2.3 Add `middleware.ts` that requires a Neon Auth session + role check on every internal route. Public (unauthenticated) routes only: landing, login/auth handlers, `POST /api/intake/website`, `GET /api/verify/[certificateId]` (and the matching verify page).
-- [ ] 2.4 Replace `/login` role-card sign-in with real credentials while keeping the existing two-column layout. Remove or gate the floating Demo controls (`components/role-switcher.tsx`) so it cannot impersonate roles in production.
+> Must land before any mutating API in 3.0+. Auth is Better Auth (Prisma adapter) writing directly to Neon Postgres — not Neon Auth. `RoleSwitcher` is a no-op.
+- [x] 2.1 Integrate Better Auth and mount its handlers under `app/api/auth/[...all]` (SDD §A.5 route tree; Neon Auth was abandoned due to frontend user-sync races).
+- [x] 2.2 Persist application `users` (id, name, email, role, createdAt) against Auth identities. Role enum: `supervisor` | `ops_manager` | `admin` | `client` | `executive`.
+- [x] 2.3 Add `middleware.ts` that requires a Better Auth session on `/dashboard` and `/portal`. Public (unauthenticated) routes only: landing, login/auth handlers, `POST /api/intake/website`, `GET /api/verify/[certificateId]` (and the matching verify page). Role matrix (2.5) is still outstanding.
+- [x] 2.4 Replace `/login` role-card sign-in with real credentials while keeping the existing two-column layout. Remove or gate the floating Demo controls (`components/role-switcher.tsx`) so it cannot impersonate roles in production.
 - [ ] 2.5 Enforce the v1 permission matrix: Supervisor — gas-reading monitor + reading entry; Ops Manager — work orders, FCC lifecycle, certify, intake review; Admin — all Ops plus stock adjust; Client — own FCCs in `/portal` only; Executive — authenticated role exists, but no dashboard (SDD open item; do not invent one).
 - [ ] 2.6 Document how the first Admin user is created (invite / seed) so 4.2 is not blocked on an empty `users` table.
 
@@ -114,3 +114,5 @@ This file combines the planned development roadmap and the reactive work log (fi
 
 ## Reactive Log
 2026-09-11 — Pinned `prisma@6.7.0` (+ `@prisma/client`, `@prisma/adapter-neon`, `@neondatabase/serverless@0.10.4`) after discovering pnpm resolved to the unstable `prisma@8.0.0-rc.13` RC which has a breaking CLI architecture change (`generate` command removed) requiring Node 22.18+ and a `prisma.config.ts`-based datasource instead of `schema.prisma url = env(...)`. Stable 6.7.0 is compatible with Node 22.13.0 and the standard `schema.prisma` pattern used in this codebase.
+2026-09-16 — Auth flow hardened: public Sign Up UI removed from `/login` (enterprise invite-only model). Hardcoded `currentUser` mock (`Grace Phiri`) stripped from `components/topbar.tsx` and deleted from `lib/mock-data.ts`; replaced with real `useCurrentUser()` hook and a skeleton loader. Developer's own account escalated to `admin` role via one-off script. Tasks 2.1–2.4 marked complete. Remaining: 2.5 RBAC enforcement, 2.6 first-admin docs.
+2026-09-21 — Completed Neon Auth → Better Auth cutover. Neon Auth packages, `/api/auth/sync`, and `/api/auth/me` removed. Better Auth Prisma adapter writes `users` / `sessions` / `accounts` / `verifications` directly; `role` is an additional field (`input: false`); public `sign-up/email` is disabled. Seed creates credential accounts (`accountId` = user id). Login verified: `POST /api/auth/sign-in/email` returns 200 with `role: admin`. Prisma Neon HTTP adapter used for DATABASE_URL (WebSocket Pool was dropping the connection string). First-admin path: `npx prisma db seed` (admin@primon.mw) or `tsx prisma/seed-admin.ts --email <email>`. Remaining: 2.5 permission matrix, 2.6 README-facing docs.
