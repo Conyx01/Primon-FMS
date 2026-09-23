@@ -1,10 +1,11 @@
 "use client";
 
-import { Bell, LogOut } from "lucide-react";
+import { Bell, LogOut, Menu } from "lucide-react";
 import { useDemo } from "@/lib/store";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { authClient } from "@/lib/auth/client";
 import { useRouter } from "next/navigation";
+import { useUI } from "@/lib/ui-context";
 
 export function Topbar({
   title,
@@ -18,16 +19,25 @@ export function Topbar({
   const { workOrders } = useDemo();
   const { user, role, isLoading } = useCurrentUser();
   const router = useRouter();
+  const { setIsMobileNavOpen } = useUI();
   
   const flagged = workOrders.filter((w) => w.status === "flagged").length;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-canvas/80 px-6 py-5 backdrop-blur-md lg:px-10">
-      <div>
-        <h1 className="font-display text-2xl text-primon-950">{title}</h1>
-        {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+    <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-canvas/80 px-4 sm:px-6 backdrop-blur-md lg:px-10">
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          onClick={() => setIsMobileNavOpen(true)}
+          className="shrink-0 rounded-md p-1.5 text-primon-950 transition-colors hover:bg-primon-50 lg:hidden"
+          aria-label="Open sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="min-w-0 truncate">
+          <h1 className="truncate font-display text-lg sm:text-xl text-primon-950">{title}</h1>
+        </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         {action}
         <button
           aria-label="Notifications"

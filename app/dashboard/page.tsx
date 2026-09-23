@@ -24,14 +24,23 @@ export default function DashboardPage() {
         title="Overview"
         description="Today's fumigation operations across tobacco and grain work orders"
         action={
-          <Link href="/dashboard/work-orders/new">
-            <Button size="sm">New work order</Button>
-          </Link>
+          <div className="hidden sm:block">
+            <Link href="/dashboard/work-orders/new">
+              <Button size="sm">New work order</Button>
+            </Link>
+          </div>
         }
       />
 
-      <div className="px-6 py-8 lg:px-10">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="w-full min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+        <div className="mb-6 sm:hidden">
+          <Link href="/dashboard/work-orders/new">
+            <Button className="w-full">New work order</Button>
+          </Link>
+        </div>
+
+        {/* 1. KPI Cards Section */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-4 min-w-0">
           <KpiCard
             label="Active work orders"
             value={String(active.length)}
@@ -59,57 +68,62 @@ export default function DashboardPage() {
             icon={PackageSearch}
             tone={lowStock.length ? "critical" : "default"}
           />
-        </div>
+        </section>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_340px]">
-          <Card>
-            <CardHeader
-              title="Active work orders"
-              description="Every job currently moving through the certificate lifecycle"
-            />
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted">
-                    <th className="px-6 py-3 font-medium">Work order</th>
-                    <th className="px-3 py-3 font-medium">Client</th>
-                    <th className="px-3 py-3 font-medium">Crop</th>
-                    <th className="px-3 py-3 font-medium">Created</th>
-                    <th className="px-3 py-3 font-medium">Status</th>
-                    <th className="px-6 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {active.map((w) => (
-                    <tr key={w.id} className="border-b border-border last:border-0 hover:bg-primon-50/50">
-                      <td className="px-6 py-3.5 font-medium text-primon-900">{w.code}</td>
-                      <td className="px-3 py-3.5 text-ink">{w.client}</td>
-                      <td className="px-3 py-3.5 capitalize text-ink">{w.cropType}</td>
-                      <td className="px-3 py-3.5 text-muted">{formatDate(w.createdAt)}</td>
-                      <td className="px-3 py-3.5">
-                        <FccStatusPill status={w.status} />
-                      </td>
-                      <td className="px-6 py-3.5 text-right">
-                        <Link
-                          href={
-                            w.status === "draft"
-                              ? "/dashboard/work-orders/new"
-                              : `/dashboard/monitor/${w.id}`
-                          }
-                          className="text-xs font-medium text-primon-700 hover:text-primon-900"
-                        >
-                          {w.status === "draft" ? "Continue" : "Open"} →
-                        </Link>
-                      </td>
+        {/* Dashboard Main Content Grid */}
+        <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_340px] min-w-0 items-start">
+          {/* 2. Active Work Orders Table Section */}
+          <section className="min-w-0 max-w-full">
+            <Card className="min-w-0 overflow-hidden">
+              <CardHeader
+                title="Active work orders"
+                description="Every job currently moving through the certificate lifecycle"
+              />
+              <div className="w-full overflow-x-auto touch-pan-x">
+                <table className="w-full min-w-[640px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-xs text-muted">
+                      <th className="px-4 sm:px-6 py-3 font-medium">Work order</th>
+                      <th className="px-3 py-3 font-medium">Client</th>
+                      <th className="px-3 py-3 font-medium">Crop</th>
+                      <th className="px-3 py-3 font-medium">Created</th>
+                      <th className="px-3 py-3 font-medium">Status</th>
+                      <th className="px-4 sm:px-6 py-3" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                  </thead>
+                  <tbody>
+                    {active.map((w) => (
+                      <tr key={w.id} className="border-b border-border last:border-0 hover:bg-primon-50/50">
+                        <td className="px-4 sm:px-6 py-3.5 font-medium text-primon-900">{w.code}</td>
+                        <td className="px-3 py-3.5 text-ink">{w.client}</td>
+                        <td className="px-3 py-3.5 capitalize text-ink">{w.cropType}</td>
+                        <td className="px-3 py-3.5 text-muted">{formatDate(w.createdAt)}</td>
+                        <td className="px-3 py-3.5">
+                          <FccStatusPill status={w.status} />
+                        </td>
+                        <td className="px-4 sm:px-6 py-3.5 text-right">
+                          <Link
+                            href={
+                              w.status === "draft"
+                                ? "/dashboard/work-orders/new"
+                                : `/dashboard/monitor/${w.id}`
+                            }
+                            className="text-xs font-medium text-primon-700 hover:text-primon-900"
+                          >
+                            {w.status === "draft" ? "Continue" : "Open"} →
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </section>
 
-          <div className="space-y-6">
-            <Card>
+          {/* 3. Critical Readings & Stock Alerts Section */}
+          <section className="space-y-6 min-w-0 max-w-full">
+            <Card className="min-w-0">
               <CardHeader
                 eyebrow={flagged.length ? "Needs attention" : undefined}
                 title="Critical readings"
@@ -135,7 +149,7 @@ export default function DashboardPage() {
               </div>
             </Card>
 
-            <Card>
+            <Card className="min-w-0">
               <CardHeader title="Stock alerts" />
               <div className="space-y-3 p-4">
                 {lowStock.length === 0 && (
@@ -156,7 +170,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             </Card>
-          </div>
+          </section>
         </div>
       </div>
     </div>
