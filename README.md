@@ -1,74 +1,68 @@
-# Primon Fumigation Management System — Frontend Demo (v1)
+# Primon Fumigation Management System (FMS)
 
-A frontend-only demonstration build of the Primon FMS, for Primon Enterprises Limited.
-Built with **Next.js (App Router) + TypeScript + Tailwind CSS**. There is **no backend** —
-all data is seeded from `lib/mock-data.ts` and persisted to `localStorage` via a small
-context store (`lib/store.tsx`), so interactions (creating a work order, logging a gas
-reading, adjusting stock) feel real within a browser session without a database.
+A full-stack application built for Primon Enterprises Limited to manage fumigation workflows, gas reading monitoring, and certificate generation.
 
-## Getting started
+## Tech Stack
+- **Framework:** Next.js (App Router) + TypeScript
+- **Styling:** Tailwind CSS
+- **Database:** Neon Serverless Postgres
+- **ORM:** Prisma Client with `@prisma/adapter-neon`
+- **Authentication:** Better Auth (Prisma Adapter)
+- **Deployment:** Vercel
 
-```bash
-npm install
-npm run dev
+## Getting Started (Local Development)
+
+### 1. Environment Variables
+Create a `.env.local` file in the root of the project with the following required variables:
+
+```env
+DATABASE_URL="postgresql://[user]:[password]@[neon-host]/neondb?sslmode=require"
+BETTER_AUTH_SECRET="your-secure-random-string-here"
+BETTER_AUTH_URL="http://localhost:3000"
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+### 2. Install & Migrate
+```bash
+# Install dependencies
+npm install
 
-> **Note:** this project uses `next/font/google` (Fraunces + Inter), which fetches
-> fonts at build time and therefore requires an internet connection the first time
-> you run `npm run dev` or `npm run build`.
+# Generate Prisma Client and apply migrations to your database
+npx prisma generate
+npx prisma migrate deploy
+```
 
-## Demo flow
+### 3. Create the First Admin User
+**Public sign-ups are disabled.** This application uses an enterprise invite/seeding model.
+To populate the database with the initial set of reference users (including an Admin), run the database seed script:
 
-There's no real authentication. Use the **"Demo controls"** button in the bottom-right
-corner of any internal/portal page, or the role cards on `/login`, to switch between:
+```bash
+npx prisma db seed
+```
+This script creates four users with standard demo credentials. Check `prisma/seed.ts` for the exact emails and passwords (default password is `Primon@2026!` and Admin is `Admin@Primon2026!`).
 
-- **Operations Manager** / **Admin** — `/dashboard`: overview, create work orders, review
-  flagged readings, manage stock, and triage website submissions.
-- **Fumigation Supervisor** — `/dashboard/monitor`: log daily gas readings against the
-  600ppm threshold.
-- **Client** — `/portal`: track certificate progress, edit shipping instructions, and
-  view/download the certified FCC.
+### 4. Run the Application
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) and sign in.
 
-A good end-to-end path to demo:
-
-1. `/login` → sign in as **Operations Manager**.
-2. **New work order** → step through the FCC wizard (work order → shipping instructions
-   → fumigation description → review) and create it. This deducts stock and opens a
-   fresh 6-day monitoring window.
-3. Open the new work order from **Gas-reading monitor** and log Day 1 (try a value under
-   600 to see the critical flag, then log a corrective action to clear it).
-4. Once all 6 days are resolved, **Certify FCC** to generate the certificate + QR.
-5. Switch to **Client** in the demo controls to see the same certificate from the
-   client's read-only view.
-
-## Project structure
+## Project Structure
 
 ```
 app/
   page.tsx                     Landing page
-  login/page.tsx                Role-based demo sign-in
-  dashboard/                    Internal app (Ops Manager / Admin / Supervisor)
-    page.tsx                    Overview
-    work-orders/new/page.tsx    FCC creation wizard
-    monitor/                    Gas-reading monitor (list + per-work-order board)
-    inventory/page.tsx          Fumigant stock
-    intake/page.tsx             Public-website submissions (RFQ/RFW/work order)
-  portal/                       Client portal
-  certificate/[id]/page.tsx     Standalone certificate / QR verification view
-components/                     Shared UI (button, card, status pills, gas gauge, etc.)
-lib/                            Types, mock data, the localStorage-backed demo store
+  login/page.tsx               Sign-in page
+  api/auth/[...all]/route.ts   Better Auth handler
+  dashboard/                   Internal app (Ops Manager / Admin / Supervisor)
+  portal/                      Client portal
+  certificate/[id]/page.tsx    Standalone certificate view
+components/                    Shared UI components
+lib/                           Types, auth helpers, and Prisma client
+prisma/                        Database schema, migrations, and seed scripts
 ```
 
-## What's simulated vs. real
+## Deployment (Vercel CI/CD)
+When deploying to Vercel, ensure you have set all Environment Variables in your Vercel project settings. 
 
-- **Real:** all UI, layout, interaction states, form logic, the fumigant/formulation/
-  crop-type filtering rules, the 600ppm threshold flagging logic, and localStorage
-  persistence within a browser session.
-- **Simulated:** authentication, email/SMS notifications (shown as in-app toasts only),
-  PDF generation/download, and QR codes (visual placeholders, not scannable).
-
-This is the frontend groundwork for the full system described in the accompanying
-Requirements Document and System Design Document — the next phase wires this UI to
-the real Neon/Drizzle/Vercel backend.
+The `package.json` build script is configured to automatically run database migrations during deployment:
+`"build": "prisma generate && prisma migrate deploy && next build"`

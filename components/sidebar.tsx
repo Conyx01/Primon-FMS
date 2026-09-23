@@ -12,19 +12,27 @@ import {
 import { cn } from "@/lib/utils";
 import { PrimonLogo } from "./logo";
 import { useDemo } from "@/lib/store";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 
 const nav = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/work-orders/new", label: "New work order", icon: FilePlus2 },
-  { href: "/dashboard/monitor", label: "Gas-reading monitor", icon: Activity },
-  { href: "/dashboard/inventory", label: "Fumigant stock", icon: Boxes },
-  { href: "/dashboard/intake", label: "Website intake", icon: Inbox },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard, allowedRoles: ["admin", "ops_manager"] },
+  { href: "/dashboard/work-orders/new", label: "New work order", icon: FilePlus2, allowedRoles: ["admin", "ops_manager"] },
+  { href: "/dashboard/monitor", label: "Gas-reading monitor", icon: Activity, allowedRoles: ["admin", "ops_manager", "supervisor"] },
+  { href: "/dashboard/inventory", label: "Fumigant stock", icon: Boxes, allowedRoles: ["admin"] },
+  { href: "/dashboard/intake", label: "Website intake", icon: Inbox, allowedRoles: ["admin", "ops_manager"] },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { workOrders } = useDemo();
+  const { role } = useCurrentUser();
   const flaggedCount = workOrders.filter((w) => w.status === "flagged").length;
+
+  if (role === "client" || role === "executive") {
+    return null; // Clients and Executives don't see the dashboard sidebar
+  }
+
+  const filteredNav = nav.filter((item) => !role || item.allowedRoles.includes(role));
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-primon-950 text-primon-100 lg:flex">
@@ -33,7 +41,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-2">
-        {nav.map((item) => {
+        {filteredNav.map((item) => {
           const active =
             item.href === "/dashboard"
               ? pathname === "/dashboard"

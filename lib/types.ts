@@ -88,7 +88,7 @@ export interface StockFormulation {
   lowStockThreshold: number;
 }
 
-export type DemoRole = "ops_manager" | "admin" | "supervisor" | "client";
+export type DemoRole = "ops_manager" | "admin" | "supervisor" | "client" | "executive";
 
 export interface PendingSubmission {
   id: string;
