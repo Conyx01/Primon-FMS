@@ -16,6 +16,7 @@ export interface ShippingInstructions {
   supplierAddress: string;
   consignee: string;
   consigneeAddress: string;
+  fumigationContractor?: string;
   cropYear: string;
   tobaccoType: string;
   netWeight: string;

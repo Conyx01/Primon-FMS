@@ -1,22 +1,100 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, ClipboardCheck, PackageSearch, TriangleAlert } from "lucide-react";
+import { Activity, ClipboardCheck, PackageSearch, TriangleAlert, Search, Filter } from "lucide-react";
 import { Topbar } from "@/components/topbar";
-import { KpiCard, EmptyState } from "@/components/ui/kpi";
+import { KpiCard } from "@/components/ui/kpi";
 import { Card, CardHeader } from "@/components/ui/card";
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
+import { TextInput, Select } from "@/components/ui/input";
 import { useDemo } from "@/lib/store";
 import { formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { workOrders, stock } = useDemo();
+  const { workOrders: demoWorkOrders, stock: demoStock } = useDemo();
+  const [workOrders, setWorkOrders] = useState<any[]>([]);
+  const [stockLevels, setStockLevels] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const active = workOrders.filter((w) => w.status !== "certified");
-  const flagged = workOrders.filter((w) => w.status === "flagged");
-  const certifiedThisMonth = workOrders.filter((w) => w.status === "certified");
-  const lowStock = stock.filter((s) => s.quantityOnHand <= s.lowStockThreshold);
+  // Search & Filter States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [cropFilter, setCropFilter] = useState("all");
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      try {
+        const [woRes, stockRes] = await Promise.all([
+          fetch("/api/work-orders"),
+          fetch("/api/stock"),
+        ]);
+
+        if (woRes.ok) {
+          const woData = await woRes.json();
+          if (isMounted && woData.workOrders) {
+            setWorkOrders(woData.workOrders);
+          }
+        }
+        if (stockRes.ok) {
+          const stockData = await stockRes.json();
+          if (isMounted && stockData.stockLevels) {
+            setStockLevels(stockData.stockLevels);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading dashboard API data:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Use API data (or empty array during load)
+  const displayWorkOrders = workOrders;
+  const displayStock = stockLevels.map((s) => ({
+    id: s.id,
+    formulation: s.formulation.name,
+    fumigant: s.formulation.fumigant.name,
+    quantityOnHand: s.quantityOnHand,
+    lowStockThreshold: s.lowStockThreshold,
+  }));
+
+  // Filter logic
+  const filteredWorkOrders = displayWorkOrders.filter((w) => {
+    const status = w.fcc?.status ?? w.status;
+    const clientName = typeof w.client === "string" ? w.client : w.client?.name ?? "";
+    const codeStr = w.code ?? "";
+
+    const matchesSearch =
+      !searchQuery ||
+      codeStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      clientName.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = statusFilter === "all" || status === statusFilter;
+    const matchesCrop = cropFilter === "all" || w.cropType === cropFilter;
+
+    return matchesSearch && matchesStatus && matchesCrop;
+  });
+
+  const active = displayWorkOrders.filter(
+    (w) => (w.fcc?.status ?? w.status) !== "certified"
+  );
+  const flagged = displayWorkOrders.filter(
+    (w) => (w.fcc?.status ?? w.status) === "flagged"
+  );
+  const certifiedThisMonth = displayWorkOrders.filter(
+    (w) => (w.fcc?.status ?? w.status) === "certified"
+  );
+  const lowStock = displayStock.filter(
+    (s) => s.quantityOnHand <= s.lowStockThreshold
+  );
 
   return (
     <div>
@@ -78,6 +156,40 @@ export default function DashboardPage() {
               <CardHeader
                 title="Active work orders"
                 description="Every job currently moving through the certificate lifecycle"
+                action={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative w-48 sm:w-64">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted" />
+                      <TextInput
+                        placeholder="Search WO or Client..."
+                        className="pl-8 text-xs py-1.5 h-9"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <Select
+                      className="text-xs py-1.5 h-9 w-28"
+                      value={cropFilter}
+                      onChange={(e) => setCropFilter(e.target.value)}
+                    >
+                      <option value="all">All Crops</option>
+                      <option value="tobacco">Tobacco</option>
+                      <option value="grain">Grain</option>
+                    </Select>
+                    <Select
+                      className="text-xs py-1.5 h-9 w-28"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="draft">Draft</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="under_review">Under Review</option>
+                      <option value="flagged">Flagged</option>
+                      <option value="certified">Certified</option>
+                    </Select>
+                  </div>
+                }
               />
               <div className="w-full overflow-x-auto touch-pan-x">
                 <table className="w-full min-w-[640px] text-left text-sm">
@@ -92,29 +204,41 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {active.map((w) => (
-                      <tr key={w.id} className="border-b border-border last:border-0 hover:bg-primon-50/50">
-                        <td className="px-4 sm:px-6 py-3.5 font-medium text-primon-900">{w.code}</td>
-                        <td className="px-3 py-3.5 text-ink">{w.client}</td>
-                        <td className="px-3 py-3.5 capitalize text-ink">{w.cropType}</td>
-                        <td className="px-3 py-3.5 text-muted">{formatDate(w.createdAt)}</td>
-                        <td className="px-3 py-3.5">
-                          <FccStatusPill status={w.status} />
-                        </td>
-                        <td className="px-4 sm:px-6 py-3.5 text-right">
-                          <Link
-                            href={
-                              w.status === "draft"
-                                ? "/dashboard/work-orders/new"
-                                : `/dashboard/monitor/${w.id}`
-                            }
-                            className="text-xs font-medium text-primon-700 hover:text-primon-900"
-                          >
-                            {w.status === "draft" ? "Continue" : "Open"} →
-                          </Link>
+                    {filteredWorkOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-xs text-muted">
+                          No work orders matching the selected filters.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredWorkOrders.map((w) => {
+                        const status = w.fcc?.status ?? w.status;
+                        const clientName = typeof w.client === "string" ? w.client : w.client?.name ?? "—";
+                        return (
+                          <tr key={w.id} className="border-b border-border last:border-0 hover:bg-primon-50/50">
+                            <td className="px-4 sm:px-6 py-3.5 font-medium text-primon-900">{w.code}</td>
+                            <td className="px-3 py-3.5 text-ink">{clientName}</td>
+                            <td className="px-3 py-3.5 capitalize text-ink">{w.cropType}</td>
+                            <td className="px-3 py-3.5 text-muted">{formatDate(w.createdAt)}</td>
+                            <td className="px-3 py-3.5">
+                              <FccStatusPill status={status} />
+                            </td>
+                            <td className="px-4 sm:px-6 py-3.5 text-right">
+                              <Link
+                                href={
+                                  status === "draft"
+                                    ? "/dashboard/work-orders/new"
+                                    : `/dashboard/monitor/${w.id}`
+                                }
+                                className="text-xs font-medium text-primon-700 hover:text-primon-900"
+                              >
+                                {status === "draft" ? "Continue" : "Open"} →
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -176,3 +300,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

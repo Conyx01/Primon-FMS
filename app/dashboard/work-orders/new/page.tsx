@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info, Leaf, Wheat, Box, Layers } from "lucide-react";
 import { Topbar } from "@/components/topbar";
@@ -80,18 +80,51 @@ function RadioCard({
 
 export default function NewWorkOrderPage() {
   const router = useRouter();
-  const { stock, addWorkOrder, workOrders } = useDemo();
+  const { stock: demoStock } = useDemo();
   const [step, setStep] = useState(0);
 
   const [client, setClient] = useState("");
   const [cropType, setCropType] = useState<CropType>("tobacco");
-  const [scale, setScale] = useState<"industrial" | "smallholder">("industrial");
+  const [scale, setScale] = useState<"industrial" | "smallholder" | "household">("industrial");
   const [hasCode, setHasCode] = useState(false);
   const [suppliedCode, setSuppliedCode] = useState("");
+  const [salesOrderNo, setSalesOrderNo] = useState("");
+  const [shipmentNo, setShipmentNo] = useState("");
+  const [deliveryNo, setDeliveryNo] = useState("");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stock, setStock] = useState(demoStock);
+
+  useEffect(() => {
+    async function loadLiveStock() {
+      try {
+        const res = await fetch("/api/stock");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.stockLevels && data.stockLevels.length > 0) {
+            const mapped = data.stockLevels.map((s: any) => ({
+              id: s.id,
+              formulation: s.formulation.name,
+              fumigant: s.formulation.fumigant.name,
+              cropType: s.formulation.cropType,
+              unit: s.formulation.unit,
+              quantityOnHand: s.quantityOnHand,
+              lowStockThreshold: s.lowStockThreshold,
+            }));
+            setStock(mapped);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load live stock for wizard:", err);
+      }
+    }
+    loadLiveStock();
+  }, []);
 
   const autoCode = useMemo(
-    () => `WO-2026-${String(100 + workOrders.length + 1).padStart(5, "0")}`,
-    [workOrders.length]
+    () => `WO-2026-${String(Math.floor(Math.random() * 90000) + 10000)}`,
+    []
   );
 
   const [si, setSi] = useState<ShippingInstructions>(emptySi);
@@ -112,44 +145,73 @@ export default function NewWorkOrderPage() {
     setStep((s) => Math.max(0, s - 1));
   }
 
-  function createWorkOrder() {
-    const id = `wo-${Date.now()}`;
-    const code = hasCode && suppliedCode ? suppliedCode : autoCode;
-    const readings: GasReading[] = Array.from({ length: 6 }).map((_, i) => ({
-      day: i + 1,
-      date: new Date(Date.now() + i * 86400000).toISOString(),
-      airspace: null,
-      probeCase: null,
-      ambientTemp: null,
-      productTemp: null,
-      humidity: null,
-      status: "pending",
-    }));
+  async function createWorkOrder() {
+    setSubmitting(true);
+    setError(null);
 
-    const wo: WorkOrder = {
-      id,
-      code,
-      codeSource: hasCode ? "client_supplied" : "auto_generated",
-      client: client || "Unnamed client",
-      cropType,
-      scale,
-      status: "in_progress",
-      createdAt: new Date().toISOString(),
-      si: { ...si, complete: Boolean(si.tobaccoSupplier && si.consignee) },
-      fumigation: {
-        fumigationType,
-        fumigantName,
-        formulation,
-        dose,
-        totalVolume,
-        totalFumigantUsed,
-        complete: true,
-      },
-      readings,
-    };
+    try {
+      // 1. Create Work Order + linked FCC draft
+      const res = await fetch("/api/work-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: hasCode && suppliedCode ? suppliedCode.trim() : undefined,
+          source: hasCode ? "client_supplied" : "auto_generated",
+          cropType,
+          scale,
+          salesOrderNo: salesOrderNo.trim() || undefined,
+          shipmentNo: shipmentNo.trim() || undefined,
+          deliveryNo: deliveryNo.trim() || undefined,
+        }),
+      });
 
-    addWorkOrder(wo);
-    router.push(`/dashboard/monitor/${id}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create work order");
+      }
+
+      const fccId = data.workOrder.fcc?.id || data.workOrder.id;
+
+      // 2. Save Shipping Instructions if provided (optional - out of order completion allowed)
+      if (si.tobaccoSupplier || si.consignee) {
+        await fetch(`/api/fccs/${fccId}/si`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...si,
+            fumigationContractor: "Primon Enterprises Limited",
+          }),
+        });
+      }
+
+      // 3. Save Fumigation Description (deducts stock transactionally & sets status to in_progress)
+      if (formulation && totalVolume > 0) {
+        const descRes = await fetch(`/api/fccs/${fccId}/fumigation-description`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fumigationType,
+            fumigantName,
+            formulationName: formulation,
+            doseGm3: dose,
+            totalVolumeM3: totalVolume,
+            totalFumigantUsedG: totalFumigantUsed,
+          }),
+        });
+
+        if (!descRes.ok) {
+          const descData = await descRes.json();
+          throw new Error(descData.error || "Failed to save fumigation description");
+        }
+      }
+
+      router.push(`/dashboard/monitor/${data.workOrder.id}`);
+    } catch (err: any) {
+      console.error("Error creating work order:", err);
+      setError(err.message || "Failed to create work order. Please check network or input parameters.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -163,6 +225,12 @@ export default function NewWorkOrderPage() {
         <Card className="p-6">
           <Stepper steps={STEPS} current={step} />
         </Card>
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-status-critical/30 bg-status-criticalTint p-4 text-xs text-status-critical">
+            {error}
+          </div>
+        )}
 
         <Card className="mt-6 p-7">
           {step === 0 && (
@@ -199,22 +267,53 @@ export default function NewWorkOrderPage() {
 
               <div>
                 <Label>Scale</Label>
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <RadioCard
                     active={scale === "industrial"}
                     onClick={() => setScale("industrial")}
                     icon={Layers}
-                    title="Industrial / corporate"
+                    title="Industrial"
                     desc="Warehouse or bonded shipment"
                   />
                   <RadioCard
                     active={scale === "smallholder"}
                     onClick={() => setScale("smallholder")}
                     icon={Box}
-                    title="Smallholder / local"
+                    title="Smallholder"
                     desc="Local client, no existing code"
                   />
+                  <RadioCard
+                    active={scale === "household"}
+                    onClick={() => setScale("household")}
+                    icon={Box}
+                    title="Household"
+                    desc="Residential pest control"
+                  />
                 </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-3">
+                <FormRow label="Sales Order No. (Optional)">
+                  <TextInput
+                    placeholder="e.g. SO-99120"
+                    value={salesOrderNo}
+                    onChange={(e) => setSalesOrderNo(e.target.value)}
+                  />
+                </FormRow>
+                <FormRow label="Shipment No. (Optional)">
+                  <TextInput
+                    placeholder="e.g. SHP-48821"
+                    value={shipmentNo}
+                    onChange={(e) => setShipmentNo(e.target.value)}
+                  />
+                </FormRow>
+                <FormRow label="Delivery No. (Optional)">
+                  <TextInput
+                    placeholder="e.g. DEL-1002"
+                    value={deliveryNo}
+                    onChange={(e) => setDeliveryNo(e.target.value)}
+                  />
+                </FormRow>
               </div>
 
               <div className="rounded-xl border border-border bg-primon-50/50 p-4">
@@ -461,8 +560,8 @@ export default function NewWorkOrderPage() {
                 Continue
               </Button>
             ) : (
-              <Button variant="brass" onClick={createWorkOrder} disabled={!formulation}>
-                Create work order & start fumigation
+              <Button variant="brass" onClick={createWorkOrder} disabled={submitting}>
+                {submitting ? "Creating..." : "Create work order & start fumigation"}
               </Button>
             )}
           </div>

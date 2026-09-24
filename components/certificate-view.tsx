@@ -163,6 +163,7 @@ export const CertificateView = forwardRef<HTMLElement, {
             <section>
               <SectionLabel n="1" title="Shipping instructions — tobacco / grain description" />
               <dl className="grid grid-cols-4 gap-x-4 gap-y-2">
+                <CompactField className="col-span-2" label="Fumigation contractor" value={si.fumigationContractor || "Primon Enterprises Limited"} />
                 <CompactField className="col-span-2" label="Tobacco / grain supplier" value={si.tobaccoSupplier} />
                 <CompactField className="col-span-2" label="Consignee" value={si.consignee} />
                 <CompactField className="col-span-2" label="Supplier address" value={si.supplierAddress} />
@@ -228,26 +229,33 @@ export const CertificateView = forwardRef<HTMLElement, {
                     <th className="px-2 py-1 font-medium">Probe/Case (ppm)</th>
                     <th className="px-2 py-1 font-medium">Ambient °C</th>
                     <th className="px-2 py-1 font-medium">Product °C</th>
+                    <th className="px-2 py-1 font-medium">RH %</th>
                     <th className="px-2 py-1 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {workOrder.readings.map((r) => (
-                    <tr key={r.day} className="border-b border-border last:border-0">
-                      <td className="px-2 py-1 text-[11px] font-medium text-primon-900">Day {r.day}</td>
-                      <td className="num px-2 py-1 text-[11px]">{r.airspace ?? "—"}</td>
-                      <td className="num px-2 py-1 text-[11px]">{r.probeCase ?? "—"}</td>
-                      <td className="num px-2 py-1 text-[11px]">
-                        {r.ambientTemp != null ? r.ambientTemp.toFixed(1) : "—"}
-                      </td>
-                      <td className="num px-2 py-1 text-[11px]">
-                        {r.productTemp != null ? r.productTemp.toFixed(1) : "—"}
-                      </td>
-                      <td className="px-2 py-1">
-                        <DayStatusPill status={r.status} />
-                      </td>
-                    </tr>
-                  ))}
+                  {workOrder.readings.map((r: any) => {
+                    const rh = r.humidity ?? r.relativeHumidityPct;
+                    return (
+                      <tr key={r.day} className="border-b border-border last:border-0">
+                        <td className="px-2 py-1 text-[11px] font-medium text-primon-900">Day {r.day}</td>
+                        <td className="num px-2 py-1 text-[11px]">{r.airspace ?? "—"}</td>
+                        <td className="num px-2 py-1 text-[11px]">{r.probeCase ?? "—"}</td>
+                        <td className="num px-2 py-1 text-[11px]">
+                          {r.ambientTemp != null ? r.ambientTemp.toFixed(1) : "—"}
+                        </td>
+                        <td className="num px-2 py-1 text-[11px]">
+                          {r.productTemp != null ? r.productTemp.toFixed(1) : "—"}
+                        </td>
+                        <td className="num px-2 py-1 text-[11px]">
+                          {rh != null ? `${rh}%` : "—"}
+                        </td>
+                        <td className="px-2 py-1">
+                          <DayStatusPill status={r.status} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {corrective.length > 0 && (
