@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Info, Leaf, Wheat, Box, Layers } from "lucide-react";
 import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
@@ -15,9 +15,7 @@ import {
   CropType,
   FumigantName,
   FumigationType,
-  GasReading,
   ShippingInstructions,
-  WorkOrder,
 } from "@/lib/types";
 
 const STEPS = ["Work order", "Shipping instructions", "Fumigation description", "Review"];
@@ -39,6 +37,42 @@ const emptySi: ShippingInstructions = {
   warehouseSection: "",
   complete: false,
 };
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Guess crop type from a free-text cropOrService string. */
+function guessCropType(cropOrService: string): CropType {
+  const lower = cropOrService.toLowerCase();
+  if (
+    lower.includes("grain") ||
+    lower.includes("maize") ||
+    lower.includes("sorghum") ||
+    lower.includes("cereal") ||
+    lower.includes("wheat")
+  ) {
+    return "grain";
+  }
+  return "tobacco";
+}
+
+/** Guess scale from a free-text cropOrService string. */
+function guessScale(
+  cropOrService: string
+): "industrial" | "smallholder" | "household" {
+  const lower = cropOrService.toLowerCase();
+  if (
+    lower.includes("household") ||
+    lower.includes("residential") ||
+    lower.includes("pest control") ||
+    lower.includes("termite") ||
+    lower.includes("rodent")
+  ) {
+    return "household";
+  }
+  return "industrial";
+}
+
+// ── Sub-components ───────────────────────────────────────────────────────────
 
 function RadioCard({
   active,
@@ -78,11 +112,17 @@ function RadioCard({
   );
 }
 
-export default function NewWorkOrderPage() {
+// ── Main wizard (needs useSearchParams → wrapped in Suspense below) ──────────
+
+function NewWorkOrderWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromSubmissionId = searchParams.get("fromSubmission");
+
   const { stock: demoStock } = useDemo();
   const [step, setStep] = useState(0);
 
+  // Step 0 fields
   const [client, setClient] = useState("");
   const [cropType, setCropType] = useState<CropType>("tobacco");
   const [scale, setScale] = useState<"industrial" | "smallholder" | "household">("industrial");
@@ -92,10 +132,14 @@ export default function NewWorkOrderPage() {
   const [shipmentNo, setShipmentNo] = useState("");
   const [deliveryNo, setDeliveryNo] = useState("");
 
+  // Intake pre-fill banner
+  const [intakeBannerText, setIntakeBannerText] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stock, setStock] = useState(demoStock);
 
+  // Load live stock
   useEffect(() => {
     async function loadLiveStock() {
       try {
@@ -103,7 +147,7 @@ export default function NewWorkOrderPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.stockLevels && data.stockLevels.length > 0) {
-            const mapped = data.stockLevels.map((s: any) => ({
+            const mapped = data.stockLevels.map((s: { id: string; quantityOnHand: number; lowStockThreshold: number; formulation: { name: string; fumigant: { name: string }; cropType: string; unit: string } }) => ({
               id: s.id,
               formulation: s.formulation.name,
               fumigant: s.formulation.fumigant.name,
@@ -122,6 +166,36 @@ export default function NewWorkOrderPage() {
     loadLiveStock();
   }, []);
 
+  // Pre-fill from intake submission
+  useEffect(() => {
+    if (!fromSubmissionId) return;
+
+    async function prefill() {
+      try {
+        const res = await fetch(`/api/intake/pending/${fromSubmissionId}`);
+        if (!res.ok) return; // silently skip if not found / forbidden
+        const data = await res.json();
+        const p = data.submission?.payload;
+        if (!p) return;
+
+        if (p.name) setClient(p.name);
+        if (p.cropOrService) {
+          setCropType(guessCropType(p.cropOrService));
+          setScale(guessScale(p.cropOrService));
+        }
+
+        // Build a short banner to remind Ops which submission this came from
+        setIntakeBannerText(
+          `Pre-filled from website submission: "${p.name}"${p.cropOrService ? ` — ${p.cropOrService}` : ""}`
+        );
+      } catch {
+        // Non-blocking — wizard is still usable without pre-fill
+      }
+    }
+
+    prefill();
+  }, [fromSubmissionId]);
+
   const autoCode = useMemo(
     () => `WO-2026-${String(Math.floor(Math.random() * 90000) + 10000)}`,
     []
@@ -138,12 +212,8 @@ export default function NewWorkOrderPage() {
   const formOptions = availableFormulations(fumigantName, cropType, stock);
   const totalFumigantUsed = Math.round(dose * totalVolume);
 
-  function next() {
-    setStep((s) => Math.min(STEPS.length - 1, s + 1));
-  }
-  function back() {
-    setStep((s) => Math.max(0, s - 1));
-  }
+  function next() { setStep((s) => Math.min(STEPS.length - 1, s + 1)); }
+  function back() { setStep((s) => Math.max(0, s - 1)); }
 
   async function createWorkOrder() {
     setSubmitting(true);
@@ -156,7 +226,11 @@ export default function NewWorkOrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: hasCode && suppliedCode ? suppliedCode.trim() : undefined,
-          source: hasCode ? "client_supplied" : "auto_generated",
+          source: fromSubmissionId
+            ? "website"
+            : hasCode
+            ? "client_supplied"
+            : "auto_generated",
           cropType,
           scale,
           salesOrderNo: salesOrderNo.trim() || undefined,
@@ -166,13 +240,11 @@ export default function NewWorkOrderPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create work order");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to create work order");
 
       const fccId = data.workOrder.fcc?.id || data.workOrder.id;
 
-      // 2. Save Shipping Instructions if provided (optional - out of order completion allowed)
+      // 2. Save Shipping Instructions if provided
       if (si.tobaccoSupplier || si.consignee) {
         await fetch(`/api/fccs/${fccId}/si`, {
           method: "PATCH",
@@ -184,7 +256,7 @@ export default function NewWorkOrderPage() {
         });
       }
 
-      // 3. Save Fumigation Description (deducts stock transactionally & sets status to in_progress)
+      // 3. Save Fumigation Description (deducts stock & sets status to in_progress)
       if (formulation && totalVolume > 0) {
         const descRes = await fetch(`/api/fccs/${fccId}/fumigation-description`, {
           method: "POST",
@@ -205,10 +277,23 @@ export default function NewWorkOrderPage() {
         }
       }
 
+      // 4. Mark the originating intake submission as converted (non-blocking)
+      if (fromSubmissionId) {
+        fetch(`/api/intake/pending/${fromSubmissionId}/convert`, {
+          method: "POST",
+        }).catch((e) =>
+          console.error("Failed to mark intake submission converted:", e)
+        );
+      }
+
       router.push(`/dashboard/monitor/${data.workOrder.id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating work order:", err);
-      setError(err.message || "Failed to create work order. Please check network or input parameters.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to create work order. Please check network or input parameters."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -222,6 +307,17 @@ export default function NewWorkOrderPage() {
       />
 
       <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10">
+        {/* Intake pre-fill banner */}
+        {intakeBannerText && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-brass-300 bg-brass-100/60 p-4">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-brass-600" />
+            <p className="text-xs leading-relaxed text-brass-700">
+              {intakeBannerText}. Review the pre-filled fields below and adjust
+              as needed before submitting.
+            </p>
+          </div>
+        )}
+
         <Card className="p-6">
           <Stepper steps={STEPS} current={step} />
         </Card>
@@ -544,8 +640,12 @@ export default function NewWorkOrderPage() {
               <div className="flex items-start gap-3 rounded-xl border border-primon-200 bg-primon-50 p-4">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-primon-700" />
                 <p className="text-xs leading-relaxed text-primon-800">
-                  Creating this work order deducts {totalFumigantUsed || 0}g of {formulation || "the selected formulation"} from
-                  stock and opens the 6-day gas-reading monitor for your Fumigation Supervisor.
+                  Creating this work order deducts {totalFumigantUsed || 0}g of{" "}
+                  {formulation || "the selected formulation"} from stock and opens the
+                  6-day gas-reading monitor for your Fumigation Supervisor.
+                  {fromSubmissionId && (
+                    <> The originating website submission will be marked as converted.</>
+                  )}
                 </p>
               </div>
             </div>
@@ -568,5 +668,15 @@ export default function NewWorkOrderPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ── Export wrapped in Suspense (required for useSearchParams in Next.js) ─────
+
+export default function NewWorkOrderPage() {
+  return (
+    <Suspense>
+      <NewWorkOrderWizard />
+    </Suspense>
   );
 }

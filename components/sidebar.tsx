@@ -8,6 +8,7 @@ import {
   Activity,
   Boxes,
   Inbox,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrimonLogo } from "./logo";
@@ -21,6 +22,7 @@ const nav = [
   { href: "/dashboard/monitor", label: "Gas-reading monitor", icon: Activity, allowedRoles: ["admin", "ops_manager", "supervisor"] },
   { href: "/dashboard/inventory", label: "Fumigant stock", icon: Boxes, allowedRoles: ["admin"] },
   { href: "/dashboard/intake", label: "Website intake", icon: Inbox, allowedRoles: ["admin", "ops_manager"] },
+  { href: "/dashboard/household", label: "Household clients", icon: Users, allowedRoles: ["admin", "ops_manager"] },
 ];
 
 export function Sidebar() {
