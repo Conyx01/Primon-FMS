@@ -7,7 +7,7 @@ type GetSessionResponse = {
   user: { id: string; email: string; name: string; role: string };
 };
 
-const protectedRoutes = ["/dashboard", "/portal"];
+const protectedRoutes = ["/dashboard", "/portal", "/certificate"];
 
 export async function middleware(request: NextRequest) {
   const pathName = request.nextUrl.pathname;

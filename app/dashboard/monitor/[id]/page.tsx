@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2 } from "lucide-react";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { Topbar } from "@/components/topbar";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,8 @@ function toLocalInput(value: string | null | undefined): string {
 }
 
 export default function MonitorDetailPage({ params }: { params: { id: string } }) {
+  const { role } = useCurrentUser();
+  const canIssueCert = role === "ops_manager" || role === "admin";
   const [fcc, setFcc] = useState<FccPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +100,11 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const [durationHours, setDurationHours] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [signers, setSigners] = useState({
+    supervising_fumigator: "",
+    supplier_rep: "",
+    certifying_officer: "",
+  });
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/fccs/${params.id}`);
@@ -223,6 +231,32 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       setActionNote("");
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Failed to log action");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function certifyFcc() {
+    if (!canCertify || !canIssueCert) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/fccs/${params.id}/certify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signatures: [
+            { role: "supervising_fumigator", signerName: signers.supervising_fumigator },
+            { role: "supplier_rep", signerName: signers.supplier_rep },
+            { role: "certifying_officer", signerName: signers.certifying_officer },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to certify");
+      await load();
+      showToast(`Certified ${data.fcc.certificateNumber}`);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to certify");
     } finally {
       setSaving(false);
     }
@@ -519,25 +553,79 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           </Card>
         )}
 
+        {canIssueCert && fcc.status !== "certified" && (
+          <Card className="mt-6 p-6">
+            <p className="mb-1 font-display text-lg text-primon-950">Certification sign-off</p>
+            <p className="mb-4 text-xs text-muted">
+              Names and a system timestamp stand in for wet signatures. Certifying locks the record
+              and issues the QR verification URL.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-3">
+              <FormRow label="Supervising Fumigator" required>
+                <TextInput
+                  value={signers.supervising_fumigator}
+                  onChange={(e) =>
+                    setSigners({ ...signers, supervising_fumigator: e.target.value })
+                  }
+                />
+              </FormRow>
+              <FormRow label="For the Supplier" required>
+                <TextInput
+                  value={signers.supplier_rep}
+                  onChange={(e) => setSigners({ ...signers, supplier_rep: e.target.value })}
+                />
+              </FormRow>
+              <FormRow label="Certifying Officer" required>
+                <TextInput
+                  value={signers.certifying_officer}
+                  onChange={(e) =>
+                    setSigners({ ...signers, certifying_officer: e.target.value })
+                  }
+                />
+              </FormRow>
+            </div>
+          </Card>
+        )}
+
         <div className="mt-8 flex items-center justify-between rounded-xl border border-border bg-white p-6 shadow-card">
           <div className="flex items-center gap-3">
             <FileCheck2 className="h-5 w-5 text-brass-600" />
             <div>
               <p className="text-sm font-medium text-primon-950">
-                {canCertify ? "Ready for certification (Phase 7)" : "Certification pending"}
+                {fcc.status === "certified"
+                  ? "Certified"
+                  : canCertify
+                    ? "Ready to certify"
+                    : "Certification pending"}
               </p>
               <p className="text-xs text-muted">
-                {canCertify
-                  ? "All 6 days resolved and close-out recorded. Certification is implemented in Phase 7."
-                  : "Complete all 6 daily readings, resolve critical flags, and record aeration close-out before certifying."}
+                {fcc.status === "certified"
+                  ? "This FCC is locked. Scan the QR on the certificate to open the public summary."
+                  : canCertify
+                    ? "All 6 days resolved and close-out recorded. Enter the three signers, then certify."
+                    : "Complete all 6 daily readings, resolve critical flags, and record aeration close-out before certifying."}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
             <Link href={`/certificate/${fcc.workOrder.id}`}>
-              <Button variant="secondary">Preview certificate</Button>
+              <Button variant="secondary">
+                {fcc.status === "certified" ? "View certificate" : "Preview certificate"}
+              </Button>
             </Link>
-            <Button variant="brass" disabled>
+            <Button
+              variant="brass"
+              onClick={certifyFcc}
+              disabled={
+                !canCertify ||
+                !canIssueCert ||
+                saving ||
+                fcc.status === "certified" ||
+                !signers.supervising_fumigator.trim() ||
+                !signers.supplier_rep.trim() ||
+                !signers.certifying_officer.trim()
+              }
+            >
               {fcc.status === "certified" ? "Certified" : "Certify FCC"}
             </Button>
           </div>

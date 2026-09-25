@@ -19,6 +19,10 @@ Create a `.env.local` file in the root of the project with the following require
 DATABASE_URL="postgresql://[user]:[password]@[neon-host]/neondb?sslmode=require"
 BETTER_AUTH_SECRET="your-secure-random-string-here"
 BETTER_AUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+# Later, when DNS is ready:
+# NEXT_PUBLIC_APP_URL="https://primon-fms.vercel.app"
+# NEXT_PUBLIC_VERIFY_ORIGIN="https://verify.primon.mw"
 ```
 
 ### 2. Install & Migrate

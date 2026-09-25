@@ -10,6 +10,9 @@ const nextConfig = {
       "@prisma/adapter-neon",
     ],
   },
+  async rewrites() {
+    return [{ source: "/fcc/:certificateId", destination: "/verify/:certificateId" }];
+  },
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

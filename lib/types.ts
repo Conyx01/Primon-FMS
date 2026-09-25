@@ -77,6 +77,12 @@ export interface WorkOrder {
   durationHours?: number;
   certificateNumber?: string;
   certifiedAt?: string;
+  verificationUrl?: string;
+  signatures?: {
+    role: string;
+    signerName: string;
+    signedAt: string;
+  }[];
 }
 
 export interface StockFormulation {

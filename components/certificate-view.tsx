@@ -288,17 +288,29 @@ export const CertificateView = forwardRef<HTMLElement, {
                       <p className="mt-3 text-[11px] text-muted">
                         Certified on {workOrder.certifiedAt ? formatDateTime(workOrder.certifiedAt) : "—"}
                         {" · "}
-                        verify.primon.mw/fcc/{workOrder.certificateNumber}
+                        {(workOrder.verificationUrl ?? "").replace(/^https?:\/\//, "")}
                       </p>
+                      {workOrder.signatures && workOrder.signatures.length > 0 && (
+                        <ul className="mt-2 space-y-0.5 text-[10px] text-ink">
+                          {workOrder.signatures.map((s) => (
+                            <li key={s.role}>
+                              <span className="text-muted">{s.role.replaceAll("_", " ")}:</span>{" "}
+                              {s.signerName}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <p className="mt-1.5 text-[10px] text-muted">
                         Primon Enterprises Limited · Licensed commercial applicator, Malawi Pesticides Control Board
                       </p>
                     </div>
                   </div>
-                  <CertificateQr
-                    value={`https://verify.primon.mw/fcc/${workOrder.certificateNumber ?? workOrder.code}`}
-                    size={132}
-                  />
+                  {workOrder.verificationUrl && (
+                    <CertificateQr
+                      value={workOrder.verificationUrl}
+                      size={132}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-[11px] text-muted">
