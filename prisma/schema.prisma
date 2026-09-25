@@ -54,6 +54,7 @@ enum StockMovementType {
 }
 
 enum ReadingStatus {
+  pending
   compliant
   critical
   action_taken
@@ -312,8 +313,8 @@ model GasReading {
   fccId               String
   dayNumber           Int // 1 to 6
   readingDate         DateTime
-  airspacePpm         Float
-  probeCasePpm        Float
+  airspacePpm         Float?
+  probeCasePpm        Float?
   ambientTempC        Float?
   productTempC        Float?
   relativeHumidityPct Float?

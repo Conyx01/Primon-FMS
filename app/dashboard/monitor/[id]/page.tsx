@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2 } from "lucide-react";
 import { Topbar } from "@/components/topbar";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -11,124 +10,285 @@ import { GasDayGauge } from "@/components/gas-day-gauge";
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { FormRow, Label, TextInput } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/kpi";
-import { useDemo } from "@/lib/store";
-import { GasReading } from "@/lib/types";
+import { GasReading, FccStatus } from "@/lib/types";
 import { LETHAL_THRESHOLD } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
 
-export default function MonitorDetailPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const { workOrders, updateWorkOrder } = useDemo();
-  const wo = workOrders.find((w) => w.id === params.id);
+type ApiReading = {
+  id: string;
+  dayNumber: number;
+  readingDate: string;
+  airspacePpm: number | null;
+  probeCasePpm: number | null;
+  ambientTempC: number | null;
+  productTempC: number | null;
+  relativeHumidityPct: number | null;
+  status: GasReading["status"];
+  correctiveAction?: {
+    description: string;
+    actionTakenAt: string;
+    loggedBy?: { name: string };
+  } | null;
+};
 
+type FccPayload = {
+  id: string;
+  status: FccStatus;
+  workOrder: { id: string; code: string; client?: { name: string } | null };
+  fumigationDescription?: {
+    fumigationType: string;
+    fumigant?: { name: string };
+    formulation?: { name: string };
+  } | null;
+  gasReadings: ApiReading[];
+  closeout?: {
+    datePlaced: string;
+    aerationBegan: string | null;
+    aerationCompleted: string | null;
+    durationHours: number | null;
+  } | null;
+};
+
+function mapReading(r: ApiReading): GasReading {
+  return {
+    day: r.dayNumber,
+    date: r.readingDate,
+    airspace: r.airspacePpm,
+    probeCase: r.probeCasePpm,
+    ambientTemp: r.ambientTempC,
+    productTemp: r.productTempC,
+    humidity: r.relativeHumidityPct,
+    status: r.status,
+    correctiveAction: r.correctiveAction
+      ? {
+          note: r.correctiveAction.description,
+          loggedBy: r.correctiveAction.loggedBy?.name ?? "Staff",
+          loggedAt: r.correctiveAction.actionTakenAt,
+        }
+      : undefined,
+  };
+}
+
+function toLocalInput(value: string | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export default function MonitorDetailPage({ params }: { params: { id: string } }) {
+  const [fcc, setFcc] = useState<FccPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [logging, setLogging] = useState<number | null>(null);
-  const [form, setForm] = useState({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
+  const [form, setForm] = useState({
+    airspace: "",
+    probeCase: "",
+    ambientTemp: "",
+    productTemp: "",
+    humidity: "",
+  });
   const [actionDay, setActionDay] = useState<number | null>(null);
   const [actionNote, setActionNote] = useState("");
+  const [datePlaced, setDatePlaced] = useState("");
+  const [aerationBegan, setAerationBegan] = useState("");
+  const [aerationCompleted, setAerationCompleted] = useState("");
+  const [durationHours, setDurationHours] = useState("");
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  if (!wo) {
-    return (
-      <div>
-        <Topbar title="Gas-reading monitor" />
-        <div className="px-6 py-8 lg:px-10">
-          <EmptyState title="Work order not found" description="It may have been removed in this demo session." />
-        </div>
-      </div>
-    );
-  }
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/fccs/${params.id}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to load FCC");
+    setFcc(data.fcc);
+    const closeout = data.fcc.closeout;
+    if (closeout) {
+      setDatePlaced(toLocalInput(closeout.datePlaced));
+      setAerationBegan(toLocalInput(closeout.aerationBegan));
+      setAerationCompleted(toLocalInput(closeout.aerationCompleted));
+      setDurationHours(
+        closeout.durationHours != null ? String(closeout.durationHours) : ""
+      );
+    }
+  }, [params.id]);
 
-  const nextPendingDay = wo.readings.find((r) => r.status === "pending")?.day ?? null;
-  const allResolved =
-    wo.readings.length === 6 && wo.readings.every((r) => r.status === "compliant" || r.status === "action_taken");
-  const hasOpenCritical = wo.readings.some((r) => r.status === "critical");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await load();
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load FCC");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3200);
   }
 
-  function submitReading(day: number) {
-    const airspace = parseInt(form.airspace, 10);
-    const probeCase = parseInt(form.probeCase, 10);
-    if (Number.isNaN(airspace) || Number.isNaN(probeCase)) return;
+  const readings = (fcc?.gasReadings ?? [])
+    .slice()
+    .sort((a, b) => a.dayNumber - b.dayNumber);
+  const mapped = readings.map(mapReading);
+  const nextPendingDay = mapped.find((r) => r.status === "pending")?.day ?? null;
+  const allResolved =
+    mapped.length === 6 &&
+    mapped.every((r) => r.status === "compliant" || r.status === "action_taken");
+  const hasOpenCritical = mapped.some((r) => r.status === "critical");
+  const closeoutComplete = Boolean(
+    fcc?.closeout?.aerationBegan && fcc?.closeout?.aerationCompleted
+  );
+  const canCertify = allResolved && closeoutComplete && fcc?.status !== "certified";
 
-    const status: GasReading["status"] =
-      airspace < LETHAL_THRESHOLD || probeCase < LETHAL_THRESHOLD ? "critical" : "compliant";
-
-    const readings = wo!.readings.map((r) =>
-      r.day === day
-        ? {
-            ...r,
-            airspace,
-            probeCase,
-            ambientTemp: form.ambientTemp ? parseFloat(form.ambientTemp) : null,
-            productTemp: form.productTemp ? parseFloat(form.productTemp) : null,
-            humidity: form.humidity ? parseFloat(form.humidity) : null,
-            status,
-          }
-        : r
-    );
-
-    updateWorkOrder(wo!.id, {
-      readings,
-      status: status === "critical" ? "flagged" : wo!.status,
-    });
-
-    if (status === "critical") {
-      showToast(`Day ${day} flagged critical — Operations Manager notified in-app and by email.`);
-    } else {
-      showToast(`Day ${day} reading saved — compliant.`);
+  async function recordDatePlaced() {
+    if (!datePlaced) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/fccs/${params.id}/date-placed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ datePlaced: new Date(datePlaced).toISOString() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to record date");
+      await load();
+      showToast("Date fumigant placed recorded — 6-day window opened.");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to record date");
+    } finally {
+      setSaving(false);
     }
-
-    setLogging(null);
-    setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
   }
 
-  function submitCorrectiveAction(day: number) {
-    if (!actionNote.trim()) return;
-    const readings = wo!.readings.map((r) =>
-      r.day === day
-        ? {
-            ...r,
-            status: "action_taken" as const,
-            correctiveAction: {
-              note: actionNote,
-              loggedBy: "Grace Phiri",
-              loggedAt: new Date().toISOString(),
-            },
-          }
-        : r
+  async function submitReading(day: number) {
+    const row = readings.find((r) => r.dayNumber === day);
+    if (!row) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/readings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          readingId: row.id,
+          airspacePpm: Number(form.airspace),
+          probeCasePpm: Number(form.probeCase),
+          ambientTempC: form.ambientTemp || null,
+          productTempC: form.productTemp || null,
+          relativeHumidityPct: form.humidity || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save reading");
+      await load();
+      if (data.reading.status === "critical") {
+        showToast(`Day ${day} flagged critical — Ops Manager/Admin notified in-app.`);
+      } else {
+        showToast(`Day ${day} reading saved — compliant.`);
+      }
+      setLogging(null);
+      setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to save reading");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitCorrectiveAction(day: number) {
+    const row = readings.find((r) => r.dayNumber === day);
+    if (!row || !actionNote.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/readings/${row.id}/corrective-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: actionNote.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to log action");
+      await load();
+      showToast(`Corrective action logged for Day ${day}.`);
+      setActionDay(null);
+      setActionNote("");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to log action");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveCloseout() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/fccs/${params.id}/closeout`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aerationBegan: aerationBegan ? new Date(aerationBegan).toISOString() : null,
+          aerationCompleted: aerationCompleted
+            ? new Date(aerationCompleted).toISOString()
+            : null,
+          durationHours: durationHours ? Number(durationHours) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save close-out");
+      await load();
+      showToast("Close-out saved.");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to save close-out");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <Topbar title="Gas-reading monitor" />
+        <div className="px-6 py-8 lg:px-10">
+          <p className="text-sm text-muted">Loading work order…</p>
+        </div>
+      </div>
     );
-    const stillCritical = readings.some((r) => r.status === "critical");
-    updateWorkOrder(wo!.id, {
-      readings,
-      status: stillCritical ? "flagged" : "under_review",
-    });
-    showToast(`Corrective action logged for Day ${day}.`);
-    setActionDay(null);
-    setActionNote("");
   }
 
-  function certify() {
-    const certNo = `FCC-2026-${String(Math.floor(100000 + Math.random() * 900000))}`;
-    updateWorkOrder(wo!.id, {
-      status: "certified",
-      certificateNumber: certNo,
-      certifiedAt: new Date().toISOString(),
-      aerationBegan: wo!.aerationBegan || new Date().toISOString(),
-      aerationCompleted: wo!.aerationCompleted || new Date().toISOString(),
-      durationHours: wo!.durationHours || 168,
-    });
-    router.push(`/certificate/${wo!.id}`);
+  if (error || !fcc) {
+    return (
+      <div>
+        <Topbar title="Gas-reading monitor" />
+        <div className="px-6 py-8 lg:px-10">
+          <EmptyState
+            title="Work order not found"
+            description={error ?? "It may have been removed."}
+          />
+        </div>
+      </div>
+    );
   }
+
+  const fumigantLabel = fcc.fumigationDescription?.fumigant?.name?.replaceAll("_", " ") ?? "—";
+  const formulationLabel =
+    fcc.fumigationDescription?.formulation?.name?.replaceAll("_", " ") ?? "—";
+  const typeLabel = fcc.fumigationDescription?.fumigationType?.replaceAll("_", " ") ?? "—";
 
   return (
     <div className="pb-16">
       <Topbar
-        title={wo.code}
-        description={wo.client}
-        action={<FccStatusPill status={wo.status} />}
+        title={fcc.workOrder.code}
+        description={fcc.workOrder.client?.name ?? "—"}
+        action={<FccStatusPill status={fcc.status} />}
       />
 
       <div className="px-6 py-8 lg:px-10">
@@ -150,55 +310,92 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
             <div>
               <p className="text-xs text-muted">Fumigant</p>
-              <p className="mt-1 text-sm font-medium text-ink">{wo.fumigation.fumigantName}</p>
+              <p className="mt-1 text-sm font-medium capitalize text-ink">{fumigantLabel}</p>
             </div>
             <div>
               <p className="text-xs text-muted">Formulation</p>
-              <p className="mt-1 text-sm font-medium text-ink">{wo.fumigation.formulation}</p>
+              <p className="mt-1 text-sm font-medium capitalize text-ink">{formulationLabel}</p>
             </div>
             <div>
               <p className="text-xs text-muted">Type</p>
-              <p className="mt-1 text-sm font-medium capitalize text-ink">{wo.fumigation.fumigationType.replace("_", " ")}</p>
+              <p className="mt-1 text-sm font-medium capitalize text-ink">{typeLabel}</p>
             </div>
             <div>
               <p className="text-xs text-muted">Date fumigant placed</p>
-              <p className="mt-1 text-sm font-medium text-ink">{wo.datePlaced ? formatDate(wo.datePlaced) : "—"}</p>
+              <p className="mt-1 text-sm font-medium text-ink">
+                {fcc.closeout?.datePlaced ? formatDate(fcc.closeout.datePlaced) : "—"}
+              </p>
             </div>
           </div>
         </Card>
+
+        {!fcc.closeout && (
+          <Card className="mb-6 p-6">
+            <p className="mb-1 font-display text-lg text-primon-950">Date fumigant placed</p>
+            <p className="mb-4 text-xs text-muted">
+              Recording this date opens six consecutive calendar days (weekends/holidays included
+              until Ops confirms otherwise).
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <FormRow label="Date & time placed" required>
+                <TextInput
+                  type="datetime-local"
+                  value={datePlaced}
+                  onChange={(e) => setDatePlaced(e.target.value)}
+                />
+              </FormRow>
+              <Button onClick={recordDatePlaced} disabled={!datePlaced || saving}>
+                Open 6-day window
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {hasOpenCritical && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-status-critical/30 bg-status-criticalTint px-5 py-4">
             <TriangleAlert className="h-5 w-5 shrink-0 text-status-critical" />
             <p className="text-sm text-status-critical">
-              A reading below {LETHAL_THRESHOLD}ppm is currently unresolved. Log a corrective action to continue toward certification.
+              A reading below {LETHAL_THRESHOLD}ppm is currently unresolved. Log a corrective action
+              to continue toward certification.
             </p>
           </div>
         )}
 
-        <Card>
-          <CardHeader
-            title="6-day monitoring window"
-            description="Airspace and Probe/Case readings, checked against the 600ppm lethal threshold."
-          />
-          <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 lg:grid-cols-6">
-            {wo.readings.map((r) => (
-              <div key={r.day} className="space-y-2">
-                <GasDayGauge reading={r} />
-                {r.status === "pending" && r.day === nextPendingDay && (
-                  <Button size="sm" variant="secondary" className="w-full" onClick={() => setLogging(r.day)}>
-                    Log reading
-                  </Button>
-                )}
-                {r.status === "critical" && (
-                  <Button size="sm" variant="danger" className="w-full" onClick={() => setActionDay(r.day)}>
-                    Log action
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
+        {mapped.length > 0 && (
+          <Card>
+            <CardHeader
+              title="6-day monitoring window"
+              description="Airspace and Probe/Case readings, checked against the 600ppm lethal threshold."
+            />
+            <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 lg:grid-cols-6">
+              {mapped.map((r) => (
+                <div key={r.day} className="space-y-2">
+                  <GasDayGauge reading={r} />
+                  {r.status === "pending" && r.day === nextPendingDay && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => setLogging(r.day)}
+                    >
+                      Log reading
+                    </Button>
+                  )}
+                  {r.status === "critical" && (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      className="w-full"
+                      onClick={() => setActionDay(r.day)}
+                    >
+                      Log action
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {logging !== null && (
           <Card className="mt-6 p-6">
@@ -245,7 +442,10 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               <Button variant="ghost" onClick={() => setLogging(null)}>
                 Cancel
               </Button>
-              <Button onClick={() => submitReading(logging)} disabled={!form.airspace || !form.probeCase}>
+              <Button
+                onClick={() => submitReading(logging)}
+                disabled={!form.airspace || !form.probeCase || saving}
+              >
                 Save reading
               </Button>
             </div>
@@ -254,7 +454,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
 
         {actionDay !== null && (
           <Card className="mt-6 border-status-critical/30 p-6">
-            <p className="mb-1 font-display text-lg text-primon-950">Corrective action — Day {actionDay}</p>
+            <p className="mb-1 font-display text-lg text-primon-950">
+              Corrective action — Day {actionDay}
+            </p>
             <p className="mb-4 text-xs text-muted">
               Describe the action taken to restore gas concentration above {LETHAL_THRESHOLD}ppm.
             </p>
@@ -269,8 +471,49 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               <Button variant="ghost" onClick={() => setActionDay(null)}>
                 Cancel
               </Button>
-              <Button onClick={() => submitCorrectiveAction(actionDay)} disabled={!actionNote.trim()}>
+              <Button
+                onClick={() => submitCorrectiveAction(actionDay)}
+                disabled={!actionNote.trim() || saving}
+              >
                 Confirm action
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {fcc.closeout && (
+          <Card className="mt-6 p-6">
+            <p className="mb-1 font-display text-lg text-primon-950">Fumigation close-out</p>
+            <p className="mb-4 text-xs text-muted">
+              Aeration times are recorded here. They are not stamped automatically at certification.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-3">
+              <FormRow label="Aeration began">
+                <TextInput
+                  type="datetime-local"
+                  value={aerationBegan}
+                  onChange={(e) => setAerationBegan(e.target.value)}
+                />
+              </FormRow>
+              <FormRow label="Aeration completed">
+                <TextInput
+                  type="datetime-local"
+                  value={aerationCompleted}
+                  onChange={(e) => setAerationCompleted(e.target.value)}
+                />
+              </FormRow>
+              <FormRow label="Duration / total hours under gas">
+                <TextInput
+                  type="number"
+                  value={durationHours}
+                  onChange={(e) => setDurationHours(e.target.value)}
+                  placeholder="Auto from aeration times if blank"
+                />
+              </FormRow>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <Button onClick={saveCloseout} disabled={saving}>
+                Save close-out
               </Button>
             </div>
           </Card>
@@ -281,21 +524,21 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             <FileCheck2 className="h-5 w-5 text-brass-600" />
             <div>
               <p className="text-sm font-medium text-primon-950">
-                {allResolved ? "Ready to certify" : "Certification pending"}
+                {canCertify ? "Ready for certification (Phase 7)" : "Certification pending"}
               </p>
               <p className="text-xs text-muted">
-                {allResolved
-                  ? "All 6 days resolved. Certifying locks the record and generates the QR code."
-                  : "Complete all 6 daily readings, resolving any critical flags, before certifying."}
+                {canCertify
+                  ? "All 6 days resolved and close-out recorded. Certification is implemented in Phase 7."
+                  : "Complete all 6 daily readings, resolve critical flags, and record aeration close-out before certifying."}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Link href={`/certificate/${wo.id}`}>
+            <Link href={`/certificate/${fcc.workOrder.id}`}>
               <Button variant="secondary">Preview certificate</Button>
             </Link>
-            <Button variant="brass" onClick={certify} disabled={!allResolved || wo.status === "certified"}>
-              {wo.status === "certified" ? "Certified" : "Certify FCC"}
+            <Button variant="brass" disabled>
+              {fcc.status === "certified" ? "Certified" : "Certify FCC"}
             </Button>
           </div>
         </div>

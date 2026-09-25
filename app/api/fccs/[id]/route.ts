@@ -38,7 +38,12 @@ export async function GET(
           },
         },
         gasReadings: {
-          include: { correctiveAction: true },
+          include: {
+            correctiveAction: {
+              include: { loggedBy: { select: { id: true, name: true, email: true } } },
+            },
+            enteredBy: { select: { id: true, name: true, email: true } },
+          },
           orderBy: { dayNumber: "asc" },
         },
         closeout: true,
