@@ -22,6 +22,62 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "readingId is required" }, { status: 400 });
     }
 
+    const existing = await prisma.gasReading.findUnique({
+      where: { id: readingId },
+      include: { fcc: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Reading not found" }, { status: 404 });
+    }
+
+    // ── Day 0: pre-fumigation temperature check only (no ppm required) ──────
+    if (existing.dayNumber === 0) {
+      const ambTempNum =
+        ambientTempC === "" || ambientTempC == null ? null : Number(ambientTempC);
+      const prodTempNum =
+        productTempC === "" || productTempC == null ? null : Number(productTempC);
+
+      if (ambTempNum === null || prodTempNum === null) {
+        return NextResponse.json(
+          { error: "Ambient temperature and Product temperature are required for Day 0" },
+          { status: 400 }
+        );
+      }
+
+      const reading = await prisma.gasReading.update({
+        where: { id: readingId },
+        data: {
+          ambientTempC: ambTempNum,
+          productTempC: prodTempNum,
+          status: ReadingStatus.compliant,
+          enteredById: session.dbUser.id,
+          enteredAt: new Date(),
+        },
+        include: {
+          enteredBy: { select: { id: true, name: true, email: true } },
+          correctiveAction: true,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          entityType: "GasReading",
+          entityId: reading.id,
+          action: "record_day0_precheck",
+          actorId: session.dbUser.id,
+          diff: {
+            dayNumber: 0,
+            ambientTempC: ambTempNum,
+            productTempC: prodTempNum,
+            productTempMeetsMinimum: prodTempNum >= 16,
+          },
+        },
+      });
+
+      return NextResponse.json({ reading, fcc: existing.fcc }, { status: 200 });
+    }
+
+    // ── Days 1-6: full gas reading with ppm ───────────────────────────────────
     const airspace = Number(airspacePpm);
     const probe = Number(probeCasePpm);
     if (!Number.isFinite(airspace) || !Number.isFinite(probe)) {
@@ -29,14 +85,6 @@ export async function POST(req: NextRequest) {
         { error: "Airspace and Probe/Case must be numeric ppm values" },
         { status: 400 }
       );
-    }
-
-    const existing = await prisma.gasReading.findUnique({
-      where: { id: readingId },
-      include: { fcc: true },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "Reading not found" }, { status: 404 });
     }
 
     const status = deriveReadingStatus(airspace, probe);

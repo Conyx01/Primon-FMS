@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +12,6 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PrimonLogo } from "./logo";
 import { useDemo } from "@/lib/store";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUI } from "@/lib/ui-context";
@@ -56,7 +56,14 @@ export function Sidebar() {
         )}
       >
         <div className="flex h-16 items-center px-5">
-          <PrimonLogo width={140} />
+          <Image
+              src="/Primon-logo.png"
+              alt="Primon Enterprises Ltd"
+              width={140}
+              height={Math.round((140 * 242) / 858)}
+              className="object-contain"
+              priority
+            />
         </div>
 
         <nav className="flex-1 space-y-1.5 px-3 py-4">

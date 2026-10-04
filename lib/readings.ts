@@ -16,3 +16,21 @@ export function addCalendarDays(start: Date, days: number): Date {
   next.setUTCDate(next.getUTCDate() + days);
   return next;
 }
+
+/**
+ * Starting from `start`, advance one calendar day at a time and collect
+ * `count` dates, skipping any date that falls on a Sunday (getUTCDay() === 0).
+ * Public holidays are handled manually by Ops.
+ */
+export function buildReadingDates(start: Date, count: number): Date[] {
+  const dates: Date[] = [];
+  let current = new Date(start);
+  while (dates.length < count) {
+    current = new Date(current);
+    current.setUTCDate(current.getUTCDate() + 1);
+    if (current.getUTCDay() !== 0) {
+      dates.push(new Date(current));
+    }
+  }
+  return dates;
+}

@@ -85,6 +85,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [logging, setLogging] = useState<number | null>(null);
+  const [loggingDay0, setLoggingDay0] = useState(false);
   const [form, setForm] = useState({
     airspace: "",
     probeCase: "",
@@ -92,6 +93,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     productTemp: "",
     humidity: "",
   });
+  const [day0Form, setDay0Form] = useState({ ambientTemp: "", productTemp: "" });
   const [actionDay, setActionDay] = useState<number | null>(null);
   const [actionNote, setActionNote] = useState("");
   const [datePlaced, setDatePlaced] = useState("");
@@ -149,11 +151,14 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     .slice()
     .sort((a, b) => a.dayNumber - b.dayNumber);
   const mapped = readings.map(mapReading);
-  const nextPendingDay = mapped.find((r) => r.status === "pending")?.day ?? null;
+  // Day 0 = pre-fumigation check; Days 1-6 = gas readings
+  const day0Reading = mapped.find((r) => r.day === 0) ?? null;
+  const mapped16 = mapped.filter((r) => r.day > 0);
+  const nextPendingDay = mapped16.find((r) => r.status === "pending")?.day ?? null;
   const allResolved =
-    mapped.length === 6 &&
-    mapped.every((r) => r.status === "compliant" || r.status === "action_taken");
-  const hasOpenCritical = mapped.some((r) => r.status === "critical");
+    mapped16.length === 6 &&
+    mapped16.every((r) => r.status === "compliant" || r.status === "action_taken");
+  const hasOpenCritical = mapped16.some((r) => r.status === "critical");
   const closeoutComplete = Boolean(
     fcc?.closeout?.aerationBegan && fcc?.closeout?.aerationCompleted
   );
@@ -174,6 +179,41 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       showToast("Date fumigant placed recorded — 6-day window opened.");
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Failed to record date");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitDay0Reading() {
+    const row = readings.find((r) => r.dayNumber === 0);
+    if (!row) return;
+    if (!day0Form.ambientTemp || !day0Form.productTemp) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/readings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          readingId: row.id,
+          ambientTempC: Number(day0Form.ambientTemp),
+          productTempC: Number(day0Form.productTemp),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save Day 0 check");
+      await load();
+      const prod = Number(day0Form.productTemp);
+      if (prod < 16) {
+        showToast(
+          `Day 0 recorded — ⚠ Product temp ${prod}°C is below 16°C minimum. Ops to review before proceeding.`
+        );
+      } else {
+        showToast("Day 0 pre-fumigation check recorded — product temp meets minimum.");
+      }
+      setLoggingDay0(false);
+      setDay0Form({ ambientTemp: "", productTemp: "" });
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to save Day 0 check");
     } finally {
       setSaving(false);
     }
@@ -367,8 +407,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           <Card className="mb-6 p-6">
             <p className="mb-1 font-display text-lg text-primon-950">Date fumigant placed</p>
             <p className="mb-4 text-xs text-muted">
-              Recording this date opens six consecutive calendar days (weekends/holidays included
-              until Ops confirms otherwise).
+              Recording this date opens a 6-day monitoring window (Sundays skipped automatically;
+              public holidays are adjusted manually by Ops). Day 0 pre-fumigation check is created
+              on the placed date itself.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <FormRow label="Date & time placed" required>
@@ -395,14 +436,107 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           </div>
         )}
 
-        {mapped.length > 0 && (
+        {/* Day 0 — pre-fumigation temperature check */}
+        {day0Reading && (
+          <Card className="mb-6">
+            <CardHeader
+              title="Day 0 — Pre-Fumigation Check"
+              description="Ambient and Product temperature recorded on the day fumigant is placed. Product temp must be ≥ 16°C to proceed."
+            />
+            <div className="px-6 pb-6">
+              {day0Reading.status === "pending" ? (
+                loggingDay0 ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2 max-w-sm">
+                      <div>
+                        <label className="block text-xs font-medium text-muted mb-1">
+                          Ambient Temp (°C) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primon-500"
+                          value={day0Form.ambientTemp}
+                          autoFocus
+                          onChange={(e) => setDay0Form({ ...day0Form, ambientTemp: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-muted mb-1">
+                          Product Temp (°C) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primon-500"
+                          value={day0Form.productTemp}
+                          onChange={(e) => setDay0Form({ ...day0Form, productTemp: e.target.value })}
+                        />
+                        {day0Form.productTemp && Number(day0Form.productTemp) < 16 && (
+                          <p className="mt-1 text-[11px] text-amber-600">
+                            ⚠ Below 16°C minimum — Ops review required before fumigating.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" onClick={() => setLoggingDay0(false)}>Cancel</Button>
+                      <Button
+                        onClick={submitDay0Reading}
+                        disabled={!day0Form.ambientTemp || !day0Form.productTemp || saving}
+                      >
+                        Save pre-fumigation check
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={() => setLoggingDay0(true)}>
+                    Record pre-fumigation temperatures
+                  </Button>
+                )
+              ) : (
+                <div className="flex items-center gap-8 text-sm">
+                  <div>
+                    <p className="text-xs text-muted">Ambient Temp</p>
+                    <p className="mt-0.5 font-medium text-ink">
+                      {day0Reading.ambientTemp != null ? `${day0Reading.ambientTemp}°C` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted">Product Temp</p>
+                    <p
+                      className={`mt-0.5 font-medium ${
+                        (day0Reading.productTemp ?? 0) < 16
+                          ? "text-amber-600"
+                          : "text-status-compliant"
+                      }`}
+                    >
+                      {day0Reading.productTemp != null ? `${day0Reading.productTemp}°C` : "—"}
+                      {day0Reading.productTemp != null && day0Reading.productTemp >= 16 && (
+                        <span className="ml-1 text-[10px]">✓ ≥ 16°C</span>
+                      )}
+                      {day0Reading.productTemp != null && day0Reading.productTemp < 16 && (
+                        <span className="ml-1 text-[10px]">⚠ below minimum</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted">Date</p>
+                    <p className="mt-0.5 font-medium text-ink">{formatDate(day0Reading.date)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Days 1-6 gauges */}
+        {mapped16.length > 0 && (
           <Card>
             <CardHeader
               title="6-day monitoring window"
               description="Airspace and Probe/Case readings, checked against the 600ppm lethal threshold."
             />
             <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 lg:grid-cols-6">
-              {mapped.map((r) => (
+              {mapped16.map((r) => (
                 <div key={r.day} className="space-y-2">
                   <GasDayGauge reading={r} />
                   {r.status === "pending" && r.day === nextPendingDay && (
@@ -602,8 +736,8 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 {fcc.status === "certified"
                   ? "This FCC is locked. Scan the QR on the certificate to open the public summary."
                   : canCertify
-                    ? "All 6 days resolved and close-out recorded. Enter the three signers, then certify."
-                    : "Complete all 6 daily readings, resolve critical flags, and record aeration close-out before certifying."}
+                    ? "All 6 gas-reading days resolved and close-out recorded. Enter the three signers, then certify."
+                    : "Complete all 6 daily gas readings (Days 1-6), resolve critical flags, and record aeration close-out before certifying."}
               </p>
             </div>
           </div>

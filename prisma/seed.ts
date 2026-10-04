@@ -7,6 +7,7 @@ config({ path: resolve(process.cwd(), '.env') }) // fallback
 
 import { PrismaClient, CropType, Role, WorkOrderSource, Scale, FccStatus, FumigationType, ReadingStatus, SignatureRole } from '@prisma/client'
 import { hashPassword } from 'better-auth/crypto'
+import { buildReadingDates } from '../lib/readings'
 
 const prisma = new PrismaClient()
 
@@ -47,6 +48,13 @@ async function main() {
       id: 'seed-user-client',
       name: 'Alliance One Tobacco Malawi',
       email: 'shipping@allianceone.mw',
+      role: Role.client,
+      password: DEFAULT_PASSWORD,
+    },
+    {
+      id: 'seed-user-midascreed',
+      name: 'MidasCreed',
+      email: 'shipping@midascreed.com',
       role: Role.client,
       password: DEFAULT_PASSWORD,
     },
@@ -104,6 +112,7 @@ async function main() {
   const opsManager = await prisma.user.findUniqueOrThrow({ where: { email: 'grace.phiri@primon.mw' } })
   const supervisor = await prisma.user.findUniqueOrThrow({ where: { email: 'john.banda@primon.mw' } })
   const clientUser = await prisma.user.findUniqueOrThrow({ where: { email: 'shipping@allianceone.mw' } })
+  const midasUser = await prisma.user.findUniqueOrThrow({ where: { email: 'shipping@midascreed.com' } })
 
   // ─────────────────────────────────────────────
   // 2. Seed Fumigants & Formulations
@@ -206,10 +215,10 @@ async function main() {
 
   const fcc = await prisma.fCC.upsert({
     where: { workOrderId: workOrder.id },
-    update: {},
+    update: { certificateNumber: 'FCC-PE-2026-000512' },
     create: {
       workOrderId: workOrder.id,
-      certificateNumber: 'FCC-2026-000512',
+      certificateNumber: 'FCC-PE-2026-000512',
       status: FccStatus.in_progress,
       shippingInstructions: {
         create: {
@@ -263,34 +272,221 @@ async function main() {
   // 6-day gas readings (idempotent — skip if already present)
   const existingReadings = await prisma.gasReading.count({ where: { fccId: fcc.id } })
   if (existingReadings === 0) {
+    const placed512 = new Date('2026-09-01T08:00:00Z')
+    await prisma.gasReading.create({
+      data: {
+        fccId: fcc.id,
+        dayNumber: 0,
+        readingDate: placed512,
+        ambientTempC: 26,
+        productTempC: 28.3,
+        status: ReadingStatus.compliant,
+        enteredById: supervisor.id,
+      },
+    })
+    const dates512 = buildReadingDates(placed512, 6)
     const sampleReadings = [
-      { dayNumber: 1, airspacePpm: 950, probeCasePpm: 910, status: ReadingStatus.compliant },
-      { dayNumber: 2, airspacePpm: 880, probeCasePpm: 860, status: ReadingStatus.compliant },
-      { dayNumber: 3, airspacePpm: 810, probeCasePpm: 790, status: ReadingStatus.compliant },
-      { dayNumber: 4, airspacePpm: 750, probeCasePpm: 720, status: ReadingStatus.compliant },
-      { dayNumber: 5, airspacePpm: 680, probeCasePpm: 660, status: ReadingStatus.compliant },
-      { dayNumber: 6, airspacePpm: 630, probeCasePpm: 610, status: ReadingStatus.compliant },
+      { dayNumber: 1, airspacePpm: 950, probeCasePpm: 910, ambientTempC: 27, status: ReadingStatus.compliant },
+      { dayNumber: 2, airspacePpm: 880, probeCasePpm: 860, ambientTempC: 26, status: ReadingStatus.compliant },
+      { dayNumber: 3, airspacePpm: 810, probeCasePpm: 790, ambientTempC: 25, status: ReadingStatus.compliant },
+      { dayNumber: 4, airspacePpm: 750, probeCasePpm: 720, ambientTempC: 26, status: ReadingStatus.compliant },
+      { dayNumber: 5, airspacePpm: 680, probeCasePpm: 660, ambientTempC: 24, status: ReadingStatus.compliant },
+      { dayNumber: 6, airspacePpm: 630, probeCasePpm: 610, ambientTempC: 25, status: ReadingStatus.compliant },
     ]
 
     for (const reading of sampleReadings) {
-      const readingDate = new Date('2026-09-01T08:00:00Z')
-      readingDate.setDate(readingDate.getDate() + (reading.dayNumber - 1))
-
       await prisma.gasReading.create({
         data: {
           fccId: fcc.id,
           dayNumber: reading.dayNumber,
-          readingDate,
+          readingDate: dates512[reading.dayNumber - 1],
           airspacePpm: reading.airspacePpm,
           probeCasePpm: reading.probeCasePpm,
+          ambientTempC: reading.ambientTempC,
           status: reading.status,
           enteredById: supervisor.id,
         },
       })
     }
-    console.log('✅ Seeded sample FCC-2026-000512 with 6-day gas readings')
+    console.log('✅ Seeded sample FCC-PE-2026-000512 with Day 0 + 6-day gas readings')
   } else {
-    console.log('ℹ️  Gas readings already exist for FCC-2026-000512, skipping')
+    const hasDay0 = await prisma.gasReading.findFirst({
+      where: { fccId: fcc.id, dayNumber: 0 },
+    })
+    if (!hasDay0) {
+      await prisma.gasReading.create({
+        data: {
+          fccId: fcc.id,
+          dayNumber: 0,
+          readingDate: new Date('2026-09-01T08:00:00Z'),
+          ambientTempC: 26,
+          productTempC: 28.3,
+          status: ReadingStatus.compliant,
+          enteredById: supervisor.id,
+        },
+      })
+      console.log('✅ Backfilled Day 0 pre-check on FCC-PE-2026-000512')
+    }
+    await prisma.gasReading.updateMany({
+      where: { fccId: fcc.id, dayNumber: { gt: 0 }, ambientTempC: null },
+      data: { ambientTempC: 26 },
+    })
+    console.log('ℹ️  Gas readings already exist for FCC-PE-2026-000512; ambient temps filled if missing')
+  }
+
+  // ─────────────────────────────────────────────
+  // 5. Certified showcase FCC — new certificate layout
+  //    Placed Saturday so Days 1-6 skip Sunday
+  // ─────────────────────────────────────────────
+
+  const adminUser = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@primon.mw' } })
+  const placed513 = new Date('2026-10-03T08:00:00Z') // Saturday
+  const dates513 = buildReadingDates(placed513, 6)
+  const aerationBegan = new Date('2026-10-10T08:00:00Z')
+  const aerationCompleted = new Date('2026-10-10T16:00:00Z')
+  const certifiedAt = new Date('2026-10-10T17:00:00Z')
+  const cert513 = 'FCC-PE-2026-000513'
+  const verify513 = 'http://localhost:3000/verify/FCC-PE-2026-000513'
+
+  const workOrder513 = await prisma.workOrder.upsert({
+    where: { code: 'WO-2026-000513' },
+    update: { clientId: midasUser.id, status: 'certified' },
+    create: {
+      code: 'WO-2026-000513',
+      source: WorkOrderSource.auto_generated,
+      cropType: CropType.tobacco,
+      scale: Scale.industrial,
+      status: 'certified',
+      clientId: midasUser.id,
+      salesOrderNo: 'SO-99301',
+      shipmentNo: 'SH-44902',
+      deliveryNo: 'DN-10380',
+      createdById: opsManager.id,
+    },
+  })
+
+  const existing513 = await prisma.fCC.findUnique({
+    where: { workOrderId: workOrder513.id },
+    include: { gasReadings: true, signatures: true, closeout: true },
+  })
+
+  if (!existing513) {
+    const fcc513 = await prisma.fCC.create({
+      data: {
+        workOrderId: workOrder513.id,
+        certificateNumber: cert513,
+        status: FccStatus.certified,
+        certifiedAt,
+        certifiedById: adminUser.id,
+        verificationUrl: verify513,
+        qrCodeUrl: verify513,
+        shippingInstructions: {
+          create: {
+            tobaccoSupplier: 'MidasCreed',
+            tobaccoSupplierAddress: 'P.O. Box 36, Manda Street',
+            consignee: 'MidasCreed',
+            consigneeAddress: 'P.O. Box 36, Manda Street',
+            fumigationContractor: 'Primon Enterprises Limited',
+            cropYear: '2026',
+            tobaccoType: 'Flue-Cured Virginia',
+            netWeight: 22450,
+            quantity: 102,
+            polylined: true,
+            gradeName: 'L1O',
+            caseNos: 'C101-C202',
+            countryOfOrigin: 'Malawi',
+            location: 'Kanengo Industrial Area',
+            warehouseSection: 'Bay 7A',
+            lockedAt: certifiedAt,
+          },
+        },
+        fumigationDescription: {
+          create: {
+            fumigationType: FumigationType.sheeted_stack,
+            fumigantId: magnesiumPhosphide.id,
+            formulationId: plate33g.id,
+            doseGm3: 1.5,
+            totalVolumeM3: 520,
+            totalFumigantUsedG: 780,
+            recordedById: opsManager.id,
+          },
+        },
+        closeout: {
+          create: {
+            datePlaced: placed513,
+            aerationBegan,
+            aerationCompleted,
+            durationHours: 168,
+          },
+        },
+        signatures: {
+          createMany: {
+            data: [
+              { role: SignatureRole.supervising_fumigator, signerName: supervisor.name, signedAt: certifiedAt },
+              { role: SignatureRole.supplier_rep, signerName: 'Hopeson Majiga', signedAt: certifiedAt },
+              { role: SignatureRole.certifying_officer, signerName: opsManager.name, signedAt: certifiedAt },
+            ],
+          },
+        },
+      },
+    })
+
+    await prisma.gasReading.create({
+      data: {
+        fccId: fcc513.id,
+        dayNumber: 0,
+        readingDate: placed513,
+        ambientTempC: 26,
+        productTempC: 28.3,
+        status: ReadingStatus.compliant,
+        enteredById: supervisor.id,
+      },
+    })
+
+    const ppm513 = [
+      { airspacePpm: 980, probeCasePpm: 940, ambientTempC: 27 },
+      { airspacePpm: 910, probeCasePpm: 880, ambientTempC: 26 },
+      { airspacePpm: 840, probeCasePpm: 810, ambientTempC: 25 },
+      { airspacePpm: 770, probeCasePpm: 740, ambientTempC: 26 },
+      { airspacePpm: 700, probeCasePpm: 680, ambientTempC: 24 },
+      { airspacePpm: 640, probeCasePpm: 620, ambientTempC: 25 },
+    ]
+
+    for (let i = 0; i < 6; i++) {
+      await prisma.gasReading.create({
+        data: {
+          fccId: fcc513.id,
+          dayNumber: i + 1,
+          readingDate: dates513[i],
+          airspacePpm: ppm513[i].airspacePpm,
+          probeCasePpm: ppm513[i].probeCasePpm,
+          ambientTempC: ppm513[i].ambientTempC,
+          status: ReadingStatus.compliant,
+          enteredById: supervisor.id,
+        },
+      })
+    }
+
+    console.log('✅ Seeded certified showcase FCC-PE-2026-000513 (MidasCreed, Day 0 + Sunday skip)')
+  } else {
+    await prisma.shippingInstructions.upsert({
+      where: { fccId: existing513.id },
+      update: {
+        tobaccoSupplier: 'MidasCreed',
+        tobaccoSupplierAddress: 'P.O. Box 36, Manda Street',
+        consignee: 'MidasCreed',
+        consigneeAddress: 'P.O. Box 36, Manda Street',
+      },
+      create: {
+        fccId: existing513.id,
+        tobaccoSupplier: 'MidasCreed',
+        tobaccoSupplierAddress: 'P.O. Box 36, Manda Street',
+        consignee: 'MidasCreed',
+        consigneeAddress: 'P.O. Box 36, Manda Street',
+        fumigationContractor: 'Primon Enterprises Limited',
+      },
+    })
+    console.log('ℹ️  Showcase FCC-PE-2026-000513 already exists — client/parties set to MidasCreed')
   }
 
   console.log('')
@@ -301,6 +497,11 @@ async function main() {
   console.log(`   grace.phiri@primon.mw    → ${DEFAULT_PASSWORD}`)
   console.log(`   john.banda@primon.mw     → ${DEFAULT_PASSWORD}`)
   console.log(`   shipping@allianceone.mw  → ${DEFAULT_PASSWORD}`)
+  console.log(`   shipping@midascreed.com  → ${DEFAULT_PASSWORD}`)
+  console.log('')
+  console.log('📄 Sample certificates:')
+  console.log('   /certificate/WO-2026-000512  (Alliance One, in progress)')
+  console.log('   /certificate/WO-2026-000513  (MidasCreed, certified showcase)')
 }
 
 main()

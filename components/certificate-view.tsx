@@ -1,328 +1,508 @@
 "use client";
 
-import { forwardRef, useState } from "react";
-import { CheckCircle2, Lock, Pencil } from "lucide-react";
-import { WorkOrder } from "@/lib/types";
-import { Card, CardHeader } from "@/components/ui/card";
-import { FccStatusPill, DayStatusPill } from "@/components/ui/status-pill";
-import { Button } from "@/components/ui/button";
-import { Label, TextInput, Select } from "@/components/ui/input";
-import { formatDate, formatDateTime, cn } from "@/lib/utils";
-import { CertificateQr } from "@/components/certificate-qr";
+import { forwardRef } from "react";
+import Image from "next/image";
+import type { WorkOrder, GasReading } from "@/lib/types";
 
-const SI_FIELDS = [
-  ["tobaccoSupplier", "Tobacco / grain supplier"],
-  ["supplierAddress", "Supplier address"],
-  ["consignee", "Consignee"],
-  ["consigneeAddress", "Consignee address"],
-  ["cropYear", "Crop year"],
-  ["tobaccoType", "Type"],
-  ["netWeight", "Net weight"],
-  ["quantity", "Quantity"],
-  ["gradeName", "Grade name"],
-  ["caseNos", "Case Nos."],
-  ["countryOfOrigin", "Country of origin"],
-  ["location", "Location"],
-  ["warehouseSection", "Warehouse section"],
-] as const;
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-function CompactField({
+function fmt(d: string | undefined | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function titleCase(s: string): string {
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function val(v: number | null | undefined): string {
+  if (v === null || v === undefined) return "—";
+  return String(v);
+}
+
+function Checkbox({ checked }: { checked: boolean }) {
+  return (
+    <span className="mr-1 inline-block h-3.5 w-3.5 rounded-sm border border-current align-middle leading-none">
+      {checked && <span className="block h-full w-full text-center text-[9px] leading-3.5">✓</span>}
+    </span>
+  );
+}
+
+function SigBlock({ label, name, date }: { label: string; name: string; date: string }) {
+  return (
+    <div className="flex flex-col gap-1 text-[9px]">
+      <span className="font-bold uppercase tracking-wide">{label}</span>
+      <div className="mt-3 border-b border-black/50 pb-0" />
+      <span className="mt-0.5 text-[8px] text-gray-500">Signature</span>
+      <span className="mt-2 font-medium">{name || "—"}</span>
+      <span className="text-[8px] text-gray-500">Printed Name</span>
+      <span className="mt-2">{date || "—"}</span>
+      <span className="text-[8px] text-gray-500">Date</span>
+    </div>
+  );
+}
+
+// ─── column definitions ──────────────────────────────────────────────────────
+
+const DAY_COLS = [
+  { day: 0, label: "Placed\n(Day 0)", hours: null },
+  { day: 1, label: "24 hrs", hours: 24 },
+  { day: 2, label: "48 hrs", hours: 48 },
+  { day: 3, label: "72 hrs", hours: 72 },
+  { day: 4, label: "96 hrs", hours: 96 },
+  { day: 5, label: "120 hrs", hours: 120 },
+  { day: 6, label: "144 hrs", hours: 144 },
+];
+
+// ─── main component ──────────────────────────────────────────────────────────
+
+interface Props {
+  workOrder: WorkOrder;
+}
+
+export const CertificateView = forwardRef<HTMLElement, Props>(function CertificateView(
+  { workOrder: wo },
+  ref
+) {
+  const si = wo.si;
+  const fum = wo.fumigation;
+
+  // Build reading lookup by dayNumber
+  const byDay = new Map<number, GasReading>(wo.readings.map((r) => [r.day, r]));
+
+  // Formulation flags
+  const formLower = (fum.formulation ?? "").toLowerCase();
+  const isPlate = formLower.includes("plate");
+  const isSachet = formLower.includes("sachet");
+  const isTablet = formLower.includes("tablet");
+
+  // Type flags
+  const isContainer = fum.fumigationType === "container";
+  const isSheeted = fum.fumigationType === "sheeted_stack";
+
+  // Signature lookup
+  const sigMap = new Map(wo.signatures?.map((s) => [s.role, s]) ?? []);
+  const sigFum = sigMap.get("supervising_fumigator");
+  const sigSup = sigMap.get("supplier_rep");
+  const sigCer = sigMap.get("certifying_officer");
+
+  const certDate = wo.certifiedAt ? fmt(wo.certifiedAt) : "—";
+
+  // Primon address (hardcoded — always the contractor)
+  const PRIMON_ADDRESS =
+    "PLOT 13/51, AFRICANA BUILDING, CAPITAL CITY,\nP.O BOX 31633, LILONGWE, MALAWI.";
+  const PRIMON_PHONE = "+265 (0) 1 754 432";
+  const PRIMON_EMAIL = "info@primonenterprises.com";
+
+  return (
+    <article
+      ref={ref}
+      className="mx-auto w-[900px] max-w-full bg-white font-sans text-[10px] text-black shadow-md print:shadow-none"
+      style={{ fontFamily: "'Arial', sans-serif" }}
+    >
+      {/* ── HEADER ── */}
+      <div className="border-b-2 border-primon-800 px-8 py-4">
+        <div className="flex items-start justify-between gap-6">
+          {/* Left: logo + company */}
+          <div className="flex flex-col gap-1.5">
+            <Image
+              src="/Primon-logo.png"
+              alt="Primon Enterprises Ltd"
+              width={160}
+              height={Math.round((160 * 242) / 858)}
+              className="object-contain"
+              priority
+              style={{ filter: "invert(1) sepia(1) saturate(3) hue-rotate(180deg)" }}
+            />
+            <p className="text-[7.5px] leading-4 text-gray-600 whitespace-pre-line">
+              {PRIMON_ADDRESS}
+              {"\n"}Tel: {PRIMON_PHONE} | Email: {PRIMON_EMAIL}
+            </p>
+          </div>
+
+          {/* Right: title + meta */}
+          <div className="flex flex-col items-end gap-1 text-right">
+            <h1 className="text-[13px] font-extrabold uppercase tracking-widest text-primon-900">
+              Fumigation Conformance Certificate
+            </h1>
+            <p className="text-[8px] font-medium text-gray-500 uppercase tracking-wide">
+              {wo.cropType === "tobacco" ? "Tobacco" : titleCase(wo.cropType)} Fumigation
+            </p>
+            {wo.certificateNumber && (
+              <p className="mt-1 rounded bg-primon-800 px-2 py-0.5 text-[9px] font-bold text-white tracking-widest">
+                {wo.certificateNumber}
+              </p>
+            )}
+            <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[8.5px]">
+              {wo.salesOrderNo && (
+                <>
+                  <span className="font-semibold text-gray-500">Sales Order No.:</span>
+                  <span>{wo.salesOrderNo}</span>
+                </>
+              )}
+              {wo.shipmentNo && (
+                <>
+                  <span className="font-semibold text-gray-500">Shipment No.:</span>
+                  <span>{wo.shipmentNo}</span>
+                </>
+              )}
+              {wo.deliveryNo && (
+                <>
+                  <span className="font-semibold text-gray-500">Delivery No.:</span>
+                  <span>{wo.deliveryNo}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 1: PARTIES ── */}
+      <section className="px-8 pt-3 pb-2">
+        <SectionTitle>1. Party Information</SectionTitle>
+        <table className="w-full border-collapse text-[9px]">
+          <tbody>
+            <PartyRow
+              label="TOBACCO SUPPLIER"
+              name={si.tobaccoSupplier || "—"}
+              address={si.supplierAddress || "—"}
+            />
+            <PartyRow
+              label="CONSIGNEE"
+              name={si.consignee || "—"}
+              address={si.consigneeAddress || "—"}
+            />
+            <PartyRow
+              label="FUMIGATION CONTRACTOR"
+              name={si.fumigationContractor || "Primon Enterprises Limited"}
+              address={PRIMON_ADDRESS.replace(/\n/g, ", ")}
+            />
+          </tbody>
+        </table>
+      </section>
+
+      {/* ── SECTION 2: TOBACCO DESCRIPTION ── */}
+      <section className="px-8 pt-2 pb-2">
+        <SectionTitle>2. Tobacco Description</SectionTitle>
+        <div className="grid grid-cols-4 gap-x-4 gap-y-1 border border-gray-300 p-2 text-[9px]">
+          <Field label="Tobacco Type" value={si.tobaccoType || "—"} />
+          <Field label="Grade Name" value={si.gradeName || "—"} />
+          <Field label="Crop Year" value={si.cropYear || "—"} />
+          <Field label="Country of Origin" value={si.countryOfOrigin || "—"} />
+          <Field label="Net Weight (kg)" value={si.netWeight || "—"} />
+          <Field label="Quantity (bales/cases)" value={si.quantity || "—"} />
+          <Field label="Polylined" value={si.polylined || "—"} />
+          <Field label="Case Nos." value={si.caseNos || "—"} />
+          <Field label="Location" value={si.location || "—"} className="col-span-2" />
+          <Field label="Warehouse Section" value={si.warehouseSection || "—"} className="col-span-2" />
+        </div>
+      </section>
+
+      {/* ── SECTION 3: FUMIGATION DESCRIPTION ── */}
+      <section className="px-8 pt-2 pb-2">
+        <SectionTitle>3. Fumigation Description</SectionTitle>
+        <div className="grid grid-cols-2 gap-x-6 border border-gray-300 p-2 text-[9px]">
+          {/* Left column */}
+          <div className="flex flex-col gap-1.5">
+            <div>
+              <span className="font-semibold text-gray-500 uppercase text-[8px]">Type</span>
+              <div className="mt-0.5 flex gap-4">
+                <label className="flex items-center gap-1">
+                  <Checkbox checked={isContainer} />
+                  Container
+                </label>
+                <label className="flex items-center gap-1">
+                  <Checkbox checked={isSheeted} />
+                  Sheeted Stack
+                </label>
+              </div>
+            </div>
+            <div>
+              <span className="font-semibold text-gray-500 uppercase text-[8px]">Formulation</span>
+              <div className="mt-0.5 flex gap-4">
+                <label className="flex items-center gap-1">
+                  <Checkbox checked={isPlate} />
+                  Plate
+                </label>
+                <label className="flex items-center gap-1">
+                  <Checkbox checked={isSachet} />
+                  Sachet
+                </label>
+                <label className="flex items-center gap-1">
+                  <Checkbox checked={isTablet} />
+                  Tablet
+                </label>
+              </div>
+            </div>
+          </div>
+          {/* Right column */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <Field label="Fumigant" value={titleCase(fum.fumigantName || "—")} />
+            <Field label="Dose (g/m³)" value={val(fum.dose)} />
+            <Field label="Total Volume (m³)" value={val(fum.totalVolume)} />
+            <Field label="Total Fumigant Used (g)" value={val(fum.totalFumigantUsed)} />
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 4: FUMIGATION DATA ── */}
+      <section className="px-8 pt-2 pb-2">
+        <SectionTitle>4. Fumigation Data</SectionTitle>
+
+        {/* Dates row */}
+        <div className="mb-1.5 grid grid-cols-3 gap-x-4 border border-gray-300 px-2 py-1 text-[9px]">
+          <Field label="Date Fumigant Placed" value={fmt(wo.datePlaced)} />
+          <Field label="Aeration Began" value={fmt(wo.aerationBegan)} />
+          <Field label="Aeration Completed" value={fmt(wo.aerationCompleted)} />
+          {wo.durationHours != null && (
+            <Field
+              label="Duration under Gas (hrs)"
+              value={String(wo.durationHours)}
+              className="col-span-3"
+            />
+          )}
+        </div>
+
+        {/* Readings table — horizontal (columns = days, rows = measurements) */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-[8.5px]">
+            <thead>
+              <tr>
+                <th className="w-[120px] border border-gray-400 bg-gray-100 px-1.5 py-1 text-left font-semibold text-gray-700">
+                  Parameter
+                </th>
+                {DAY_COLS.map((c) => (
+                  <th
+                    key={c.day}
+                    className="border border-gray-400 bg-gray-100 px-1 py-1 text-center font-semibold text-gray-700 whitespace-pre-line"
+                  >
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                <th className="border border-gray-400 bg-gray-50 px-1.5 py-0.5 text-left text-[7.5px] font-medium text-gray-500">
+                  Date
+                </th>
+                {DAY_COLS.map((c) => {
+                  const r = byDay.get(c.day);
+                  return (
+                    <td
+                      key={c.day}
+                      className="border border-gray-400 bg-gray-50 px-1 py-0.5 text-center text-[7.5px] text-gray-600"
+                    >
+                      {r ? fmt(r.date) : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Airspace ppm */}
+              <ReadingRow
+                label="Airspace (ppm)"
+                byDay={byDay}
+                getValue={(r, day) =>
+                  day === 0 ? "N/A" : val(r?.airspace)
+                }
+              />
+              {/* Probe/Case ppm */}
+              <ReadingRow
+                label="Case/Base Probe (ppm)"
+                byDay={byDay}
+                getValue={(r, day) =>
+                  day === 0 ? "N/A" : val(r?.probeCase)
+                }
+              />
+              {/* Ambient temp — all days */}
+              <ReadingRow
+                label="Ambient Temp (°C)"
+                byDay={byDay}
+                getValue={(r) => val(r?.ambientTemp)}
+                highlight={(r) => r?.ambientTemp == null}
+              />
+              {/* Product temp — Day 0 only, then N/A */}
+              <ReadingRow
+                label="Product Temp (°C)"
+                byDay={byDay}
+                getValue={(r, day) =>
+                  day === 0 ? val(r?.productTemp) : "—"
+                }
+                highlight={(r, day) =>
+                  day === 0 && (r?.productTemp ?? 0) < 16 && r?.productTemp != null
+                }
+              />
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-0.5 text-[7.5px] text-gray-400 italic">
+          * Ambient temperature must be recorded for all days. Product temperature is recorded on Day 0 (pre-fumigation check) only.
+        </p>
+      </section>
+
+      {/* ── SECTION 5: CERTIFICATION ── */}
+      <section className="px-8 pt-2 pb-3">
+        <SectionTitle>5. Certification</SectionTitle>
+        <div className="border border-gray-300 p-3 text-[8.5px] leading-5">
+          <p>
+            This is to certify that the above-described commodity was fumigated with phosphine gas
+            (Magnesium or Aluminium Phosphide) in compliance with the recommendations and guidelines
+            of <strong>CORESTA (Cooperation Centre for Scientific Research Relative to Tobacco)</strong> and
+            the requirements of the <strong>National Plant Protection Organisation (NPPO)</strong> of the
+            country of destination. The fumigation was carried out under the direct supervision of a
+            qualified and authorised fumigator, and all gas concentration readings were monitored and
+            recorded throughout the prescribed fumigation period.
+          </p>
+          <p className="mt-2">
+            The commodity was deemed compliant at the conclusion of the fumigation period, and
+            aeration was conducted prior to movement or release of the commodity. This certificate
+            is issued based on the results obtained during fumigation monitoring and is valid for the
+            purposes of phytosanitary compliance, export clearance, and trade documentation.
+          </p>
+          {wo.certificateNumber && (
+            <p className="mt-2 font-semibold">
+              Certificate No.: {wo.certificateNumber} &nbsp;|&nbsp; Date Certified: {certDate}
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ── SIGNATURES + QR ── */}
+      <section className="px-8 pb-4">
+        <div className="flex items-start gap-4">
+          {/* Signature blocks */}
+          <div className="flex flex-1 gap-6">
+            <SigBlock
+              label="Supervising Fumigator"
+              name={sigFum?.signerName ?? ""}
+              date={sigFum?.signedAt ? fmt(sigFum.signedAt) : ""}
+            />
+            <SigBlock
+              label="For the Supplier"
+              name={sigSup?.signerName ?? ""}
+              date={sigSup?.signedAt ? fmt(sigSup.signedAt) : ""}
+            />
+            <SigBlock
+              label="Certifying Officer"
+              name={sigCer?.signerName ?? ""}
+              date={sigCer?.signedAt ? fmt(sigCer.signedAt) : ""}
+            />
+          </div>
+
+          {/* QR code */}
+          {wo.verificationUrl && (
+            <div className="flex flex-col items-center gap-1 shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(wo.verificationUrl)}`}
+                alt="Verification QR"
+                width={80}
+                height={80}
+                className="rounded border border-gray-200"
+              />
+              <span className="text-[7px] text-gray-400 text-center">
+                Scan to verify
+              </span>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="border-t border-gray-200 px-8 py-1.5 text-center text-[7.5px] text-gray-300">
+        www.primonenterprises.com
+      </footer>
+    </article>
+  );
+});
+
+// ─── sub-components ──────────────────────────────────────────────────────────
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-1 text-[9px] font-bold uppercase tracking-wide text-primon-800 border-b border-primon-200 pb-0.5">
+      {children}
+    </h2>
+  );
+}
+
+function PartyRow({
+  label,
+  name,
+  address,
+}: {
+  label: string;
+  name: string;
+  address: string;
+}) {
+  return (
+    <tr>
+      <td className="w-[140px] border border-gray-300 bg-gray-50 px-2 py-1 font-bold uppercase text-[8px] text-gray-600 align-top">
+        {label}
+      </td>
+      <td className="border border-gray-300 px-2 py-1 font-medium align-top">{name}</td>
+      <td className="w-[30px] border border-gray-300 bg-gray-50 px-2 py-1 font-bold uppercase text-[8px] text-gray-600 align-top">
+        Address
+      </td>
+      <td className="border border-gray-300 px-2 py-1 align-top whitespace-pre-line">{address}</td>
+    </tr>
+  );
+}
+
+function Field({
   label,
   value,
   className,
 }: {
   label: string;
-  value?: string | number;
+  value: string;
   className?: string;
 }) {
-  const empty = value === undefined || value === null || value === "";
   return (
     <div className={className}>
-      <dt className="text-[8.5px] font-medium uppercase tracking-[0.12em] text-muted">{label}</dt>
-      <dd className={cn("mt-0.5 text-[11.5px] leading-snug", empty ? "italic text-muted/70" : "text-ink")}>
-        {empty ? "—" : value}
-      </dd>
+      <span className="block text-[7.5px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </span>
+      <span className="block font-medium">{value}</span>
     </div>
   );
 }
 
-function SectionLabel({ n, title }: { n: string; title: string }) {
+function ReadingRow({
+  label,
+  byDay,
+  getValue,
+  highlight,
+}: {
+  label: string;
+  byDay: Map<number, GasReading>;
+  getValue: (r: GasReading | undefined, day: number) => string;
+  highlight?: (r: GasReading | undefined, day: number) => boolean;
+}) {
   return (
-    <div className="mb-2.5 flex items-baseline gap-2 border-b border-primon-800/12 pb-1.5">
-      <span className="text-[9px] font-semibold text-brass-600">{n}</span>
-      <h2 className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-primon-800">{title}</h2>
-    </div>
+    <tr>
+      <td className="border border-gray-400 bg-gray-50 px-1.5 py-1 font-semibold text-gray-700">
+        {label}
+      </td>
+      {DAY_COLS.map((c) => {
+        const r = byDay.get(c.day);
+        const v = getValue(r, c.day);
+        const hl = highlight?.(r, c.day) ?? false;
+        return (
+          <td
+            key={c.day}
+            className={`border border-gray-400 px-1 py-1 text-center ${
+              hl ? "bg-red-50 font-bold text-red-700" : ""
+            }`}
+          >
+            {v}
+          </td>
+        );
+      })}
+    </tr>
   );
 }
-
-export const CertificateView = forwardRef<HTMLElement, {
-  workOrder: WorkOrder;
-  editableSi?: boolean;
-  onSaveSi?: (si: WorkOrder["si"]) => void;
-}>(function CertificateView({ workOrder, editableSi = false, onSaveSi }, ref) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(workOrder.si);
-  const locked = workOrder.status === "certified";
-  const si = editing ? draft : workOrder.si;
-  const corrective = workOrder.readings.filter((r) => r.correctiveAction);
-
-  function save() {
-    onSaveSi?.(draft);
-    setEditing(false);
-  }
-
-  return (
-    <div className="space-y-4">
-      {editableSi && !locked && (
-        <div className="no-print">
-          {editing ? (
-            <Card>
-              <CardHeader
-                eyebrow="Edit"
-                title="Shipping instructions"
-                description="Changes update the certificate sheet live. Save before handing off."
-                action={
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={save}>
-                      Save
-                    </Button>
-                  </div>
-                }
-              />
-              <div className="grid gap-5 p-6 sm:grid-cols-2">
-                {SI_FIELDS.map(([key, label]) => (
-                  <div key={key}>
-                    <Label>{label}</Label>
-                    <TextInput
-                      value={draft[key] as string}
-                      onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <Label>Polylined</Label>
-                  <Select
-                    value={draft.polylined}
-                    onChange={(e) =>
-                      setDraft({ ...draft, polylined: e.target.value as "Yes" | "No" })
-                    }
-                  >
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </Select>
-                </div>
-              </div>
-            </Card>
-          ) : (
-            <div className="flex justify-end">
-              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-                <Pencil className="h-3.5 w-3.5" /> Edit shipping instructions
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex justify-center overflow-x-auto">
-        <article ref={ref} id="certificate-sheet" className="certificate-sheet">
-          <div className="relative flex h-full flex-col gap-y-6 px-10 pb-14 pt-10">
-            <div>
-              <header className="flex items-start justify-between gap-4 border-b-2 border-primon-800 pb-4">
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/logo.png"
-                    alt="Primon Enterprises Ltd"
-                    className="h-11 w-auto object-contain"
-                  />
-                </div>
-                <div className="text-right">
-                  <p className="font-display text-[17px] leading-tight text-primon-950">
-                    Fumigation Conformance Certificate
-                  </p>
-                  <p className="num mt-0.5 text-[11px] text-muted">
-                    {workOrder.certificateNumber ?? `Pending — ${workOrder.code}`}
-                  </p>
-                  <div className="mt-1.5 flex justify-end">
-                    <FccStatusPill status={workOrder.status} />
-                  </div>
-                </div>
-              </header>
-
-              <dl className="mt-5 grid grid-cols-4 gap-x-4 gap-y-1.5">
-                <CompactField label="Sales order no." value={workOrder.salesOrderNo ?? "N/A"} />
-                <CompactField label="Shipment no." value={workOrder.shipmentNo} />
-                <CompactField label="Delivery no." value={workOrder.deliveryNo} />
-                <CompactField label="Work order code" value={workOrder.code} />
-              </dl>
-            </div>
-
-            <section>
-              <SectionLabel n="1" title="Shipping instructions — tobacco / grain description" />
-              <dl className="grid grid-cols-4 gap-x-4 gap-y-2">
-                <CompactField className="col-span-2" label="Fumigation contractor" value={si.fumigationContractor || "Primon Enterprises Limited"} />
-                <CompactField className="col-span-2" label="Tobacco / grain supplier" value={si.tobaccoSupplier} />
-                <CompactField className="col-span-2" label="Consignee" value={si.consignee} />
-                <CompactField className="col-span-2" label="Supplier address" value={si.supplierAddress} />
-                <CompactField className="col-span-2" label="Consignee address" value={si.consigneeAddress} />
-                <CompactField label="Crop year" value={si.cropYear} />
-                <CompactField label="Type" value={si.tobaccoType} />
-                <CompactField label="Net weight" value={si.netWeight} />
-                <CompactField label="Quantity" value={si.quantity} />
-                <CompactField label="Grade name" value={si.gradeName} />
-                <CompactField label="Polylined" value={si.polylined} />
-                <CompactField label="Case Nos." value={si.caseNos} />
-                <CompactField label="Country of origin" value={si.countryOfOrigin} />
-                <CompactField label="Location" value={si.location} />
-                <CompactField label="Warehouse section" value={si.warehouseSection} />
-                <CompactField label="Client" value={workOrder.client} />
-                <CompactField label="Crop" value={workOrder.cropType} />
-              </dl>
-            </section>
-
-            <section>
-              <SectionLabel n="2" title="Fumigation description" />
-              <dl className="grid grid-cols-4 gap-x-4 gap-y-2">
-                <CompactField
-                  label="Type"
-                  value={workOrder.fumigation.fumigationType.replace("_", " ")}
-                />
-                <CompactField label="Fumigant" value={workOrder.fumigation.fumigantName} />
-                <CompactField label="Formulation" value={workOrder.fumigation.formulation} />
-                <CompactField label="Dose (g/m³)" value={workOrder.fumigation.dose} />
-                <CompactField label="Total volume (m³)" value={workOrder.fumigation.totalVolume} />
-                <CompactField
-                  label="Total fumigant used (g)"
-                  value={workOrder.fumigation.totalFumigantUsed}
-                />
-              </dl>
-            </section>
-
-            <section>
-              <SectionLabel n="3" title="Fumigation data — 6-day gas readings (lethal threshold 600ppm)" />
-              <dl className="mb-2 grid grid-cols-4 gap-x-4 gap-y-1.5">
-                <CompactField
-                  label="Date fumigant placed"
-                  value={workOrder.datePlaced ? formatDate(workOrder.datePlaced) : undefined}
-                />
-                <CompactField
-                  label="Aeration began"
-                  value={workOrder.aerationBegan ? formatDate(workOrder.aerationBegan) : undefined}
-                />
-                <CompactField
-                  label="Aeration completed"
-                  value={workOrder.aerationCompleted ? formatDate(workOrder.aerationCompleted) : undefined}
-                />
-                <CompactField
-                  label="Duration under gas"
-                  value={workOrder.durationHours ? `${workOrder.durationHours} hrs` : undefined}
-                />
-              </dl>
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="bg-primon-50 text-[8.5px] uppercase tracking-wider text-muted">
-                    <th className="px-2 py-1 font-medium">Day</th>
-                    <th className="px-2 py-1 font-medium">Airspace (ppm)</th>
-                    <th className="px-2 py-1 font-medium">Probe/Case (ppm)</th>
-                    <th className="px-2 py-1 font-medium">Ambient °C</th>
-                    <th className="px-2 py-1 font-medium">Product °C</th>
-                    <th className="px-2 py-1 font-medium">RH %</th>
-                    <th className="px-2 py-1 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workOrder.readings.map((r: any) => {
-                    const rh = r.humidity ?? r.relativeHumidityPct;
-                    return (
-                      <tr key={r.day} className="border-b border-border last:border-0">
-                        <td className="px-2 py-1 text-[11px] font-medium text-primon-900">Day {r.day}</td>
-                        <td className="num px-2 py-1 text-[11px]">{r.airspace ?? "—"}</td>
-                        <td className="num px-2 py-1 text-[11px]">{r.probeCase ?? "—"}</td>
-                        <td className="num px-2 py-1 text-[11px]">
-                          {r.ambientTemp != null ? r.ambientTemp.toFixed(1) : "—"}
-                        </td>
-                        <td className="num px-2 py-1 text-[11px]">
-                          {r.productTemp != null ? r.productTemp.toFixed(1) : "—"}
-                        </td>
-                        <td className="num px-2 py-1 text-[11px]">
-                          {rh != null ? `${rh}%` : "—"}
-                        </td>
-                        <td className="px-2 py-1">
-                          <DayStatusPill status={r.status} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {corrective.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {corrective.map((r) => (
-                    <p key={r.day} className="rounded bg-status-actionTint/70 px-2 py-1 text-[10px] leading-snug text-status-action">
-                      <span className="font-medium">Day {r.day} corrective action:</span>{" "}
-                      {r.correctiveAction!.note}{" "}
-                      <span className="text-muted">
-                        — {r.correctiveAction!.loggedBy}, {formatDateTime(r.correctiveAction!.loggedAt)}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section>
-              <SectionLabel n="4" title="Certification & verification" />
-              {locked ? (
-                <div className="flex items-center justify-between gap-8">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-status-compliant" />
-                    <div>
-                      <p className="text-[12.5px] leading-relaxed text-ink">
-                        This certificate was generated and certified electronically by the
-                        Primon Fumigation Management System. No physical stamp is required —
-                        the QR code is the sole mark of authenticity.
-                      </p>
-                      <p className="mt-3 text-[11px] text-muted">
-                        Certified on {workOrder.certifiedAt ? formatDateTime(workOrder.certifiedAt) : "—"}
-                        {" · "}
-                        {(workOrder.verificationUrl ?? "").replace(/^https?:\/\//, "")}
-                      </p>
-                      {workOrder.signatures && workOrder.signatures.length > 0 && (
-                        <ul className="mt-2 space-y-0.5 text-[10px] text-ink">
-                          {workOrder.signatures.map((s) => (
-                            <li key={s.role}>
-                              <span className="text-muted">{s.role.replaceAll("_", " ")}:</span>{" "}
-                              {s.signerName}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <p className="mt-1.5 text-[10px] text-muted">
-                        Primon Enterprises Limited · Licensed commercial applicator, Malawi Pesticides Control Board
-                      </p>
-                    </div>
-                  </div>
-                  {workOrder.verificationUrl && (
-                    <CertificateQr
-                      value={workOrder.verificationUrl}
-                      size={132}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-[11px] text-muted">
-                  <Lock className="h-3.5 w-3.5" />
-                  Preview only — this record is not yet certified. The QR mark is issued when the
-                  Operations Manager certifies the FCC.
-                </div>
-              )}
-            </section>
-          </div>
-        </article>
-      </div>
-    </div>
-  );
-});

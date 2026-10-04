@@ -64,35 +64,7 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
         )}
       </div>
 
-      <CertificateView
-        ref={sheetRef}
-        workOrder={wo}
-        editableSi={wo.status !== "certified"}
-        onSaveSi={async (si) => {
-          await fetch(`/api/fccs/${params.id}/si`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tobaccoSupplier: si.tobaccoSupplier,
-              tobaccoSupplierAddress: si.supplierAddress,
-              consignee: si.consignee,
-              consigneeAddress: si.consigneeAddress,
-              fumigationContractor: si.fumigationContractor,
-              cropYear: si.cropYear,
-              tobaccoType: si.tobaccoType,
-              netWeight: si.netWeight,
-              quantity: si.quantity,
-              polylined: si.polylined === "Yes",
-              gradeName: si.gradeName,
-              caseNos: si.caseNos,
-              countryOfOrigin: si.countryOfOrigin,
-              location: si.location,
-              warehouseSection: si.warehouseSection,
-            }),
-          });
-          await load();
-        }}
-      />
+      <CertificateView ref={sheetRef} workOrder={wo} />
     </div>
   );
 }

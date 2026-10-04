@@ -47,13 +47,23 @@ export default function CertificatePage({ params }: { params: { id: string } }) 
             <ArrowLeft className="h-3.5 w-3.5" /> Back to platform
           </Link>
         </div>
-        {wo?.status === "certified" && (
-          <DownloadCertificateButton
-            targetRef={sheetRef}
-            filename={certificateFilename(wo.certificateNumber, wo.code)}
-            label="Download certified FCC"
-          />
-        )}
+        {wo?.status === "certified" && (() => {
+          // Block download if any Day 1-6 ambient temperature is missing
+          const missingAmbient = wo.readings
+            .filter((r) => r.day > 0)
+            .some((r) => r.ambientTemp === null || r.ambientTemp === undefined);
+          return missingAmbient ? (
+            <span className="rounded bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800">
+              ⚠ Record all ambient temperatures before downloading
+            </span>
+          ) : (
+            <DownloadCertificateButton
+              targetRef={sheetRef}
+              filename={certificateFilename(wo.certificateNumber, wo.code)}
+              label="Download certified FCC"
+            />
+          );
+        })()}
       </header>
 
       <div className="mx-auto px-4 py-8 lg:px-8">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { ReadingStatus } from "@prisma/client";
-import { addCalendarDays } from "@/lib/readings";
+import { buildReadingDates } from "@/lib/readings";
 
 export async function POST(
   req: NextRequest,
@@ -51,13 +51,26 @@ export async function POST(
         update: { datePlaced },
       });
 
+      // Day 0 — pre-fumigation temperature check (placed on datePlaced itself)
+      const day0 = await tx.gasReading.create({
+        data: {
+          fccId: fcc.id,
+          dayNumber: 0,
+          readingDate: datePlaced,
+          status: ReadingStatus.pending,
+          enteredById: session.dbUser.id,
+        },
+      });
+
+      // Days 1-6 — gas monitoring, skipping Sundays (public holidays = manual Ops adjustment)
+      const readingDates = buildReadingDates(datePlaced, 6);
       const readings = [];
-      for (let dayNumber = 1; dayNumber <= 6; dayNumber++) {
+      for (let i = 0; i < 6; i++) {
         const reading = await tx.gasReading.create({
           data: {
             fccId: fcc.id,
-            dayNumber,
-            readingDate: addCalendarDays(datePlaced, dayNumber - 1),
+            dayNumber: i + 1,
+            readingDate: readingDates[i],
             status: ReadingStatus.pending,
             enteredById: session.dbUser.id,
           },
@@ -73,13 +86,14 @@ export async function POST(
           actorId: session.dbUser.id,
           diff: {
             datePlaced: datePlaced.toISOString(),
+            day0Date: day0.readingDate.toISOString(),
             readingDates: readings.map((r) => r.readingDate.toISOString()),
-            weekendHolidayAssumption: "consecutive_calendar_days",
+            weekendHolidayAssumption: "sundays_skipped",
           },
         },
       });
 
-      return { closeout, readings };
+      return { closeout, day0, readings };
     });
 
     return NextResponse.json(result, { status: 201 });

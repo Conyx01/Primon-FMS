@@ -13,7 +13,7 @@ function parseSequenceNumber(code: string, prefix: string): number {
 }
 
 function formatFccNumber(year: number, seq: number): string {
-  return `FCC-${year}-${String(seq).padStart(6, "0")}`;
+  return `FCC-PE-${year}-${String(seq).padStart(6, "0")}`;
 }
 
 function formatWoNumber(year: number, seq: number): string {
@@ -22,25 +22,25 @@ function formatWoNumber(year: number, seq: number): string {
 
 describe("FCC sequential number generation", () => {
   it("formats the first certificate correctly", () => {
-    expect(formatFccNumber(2026, 1)).toBe("FCC-2026-000001");
+    expect(formatFccNumber(2026, 1)).toBe("FCC-PE-2026-000001");
   });
 
   it("formats high sequence numbers correctly", () => {
-    expect(formatFccNumber(2026, 512)).toBe("FCC-2026-000512");
+    expect(formatFccNumber(2026, 512)).toBe("FCC-PE-2026-000512");
   });
 
   it("parses the sequence number back from a certificate number", () => {
-    expect(parseSequenceNumber("FCC-2026-000512", "FCC-2026-")).toBe(512);
+    expect(parseSequenceNumber("FCC-PE-2026-000512", "FCC-PE-2026-")).toBe(512);
   });
 
-  it("next sequence after FCC-2026-000512 is 513", () => {
-    const last = "FCC-2026-000512";
-    const seq = parseSequenceNumber(last, "FCC-2026-") + 1;
-    expect(formatFccNumber(2026, seq)).toBe("FCC-2026-000513");
+  it("next sequence after FCC-PE-2026-000512 is 513", () => {
+    const last = "FCC-PE-2026-000512";
+    const seq = parseSequenceNumber(last, "FCC-PE-2026-") + 1;
+    expect(formatFccNumber(2026, seq)).toBe("FCC-PE-2026-000513");
   });
 
   it("returns 0 for a non-matching prefix", () => {
-    expect(parseSequenceNumber("FCC-2025-000100", "FCC-2026-")).toBe(0);
+    expect(parseSequenceNumber("FCC-PE-2025-000100", "FCC-PE-2026-")).toBe(0);
   });
 });
 

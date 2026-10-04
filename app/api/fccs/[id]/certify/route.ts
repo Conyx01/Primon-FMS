@@ -24,7 +24,7 @@ function parseSignerName(body: Record<string, unknown>, role: SignatureRole): st
 }
 
 async function nextCertificateNumber(year: number): Promise<string> {
-  const prefix = `FCC-${year}-`;
+  const prefix = `FCC-PE-${year}-`;
   const last = await prisma.fCC.findFirst({
     where: { certificateNumber: { startsWith: prefix } },
     orderBy: { certificateNumber: "desc" },
@@ -91,9 +91,11 @@ export async function POST(
     }
 
     const readings = fcc.gasReadings;
+    // Day 0 is a pre-fumigation check only; certification gates on Days 1-6
+    const readings16 = readings.filter((r) => r.dayNumber > 0);
     const allResolved =
-      readings.length === 6 &&
-      readings.every(
+      readings16.length === 6 &&
+      readings16.every(
         (r) => r.status === ReadingStatus.compliant || r.status === ReadingStatus.action_taken
       );
     if (!allResolved) {
@@ -102,7 +104,7 @@ export async function POST(
         { status: 409 }
       );
     }
-    if (readings.some((r) => r.status === ReadingStatus.critical)) {
+    if (readings16.some((r) => r.status === ReadingStatus.critical)) {
       return NextResponse.json(
         { error: "Unresolved critical readings block certification" },
         { status: 409 }
