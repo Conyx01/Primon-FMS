@@ -1,8 +1,9 @@
 "use client";
 
 import { forwardRef } from "react";
-import Image from "next/image";
 import type { WorkOrder, GasReading } from "@/lib/types";
+
+const PRINCE_CHIWALO = /prince\s+chiwalo/i;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -32,11 +33,30 @@ function Checkbox({ checked }: { checked: boolean }) {
   );
 }
 
-function SigBlock({ label, name, date }: { label: string; name: string; date: string }) {
+function SigBlock({
+  label,
+  name,
+  date,
+  signatureSrc,
+}: {
+  label: string;
+  name: string;
+  date: string;
+  signatureSrc?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1 text-[9px]">
+    <div className="flex min-w-[160px] flex-col gap-1 text-[9px]">
       <span className="font-bold uppercase tracking-wide">{label}</span>
-      <div className="mt-3 border-b border-black/50 pb-0" />
+      <div className="relative mt-1 h-12 border-b border-black/50">
+        {signatureSrc && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={signatureSrc}
+            alt=""
+            className="absolute bottom-0 left-0 h-11 w-auto max-w-[160px] object-contain object-left"
+          />
+        )}
+      </div>
       <span className="mt-0.5 text-[8px] text-gray-500">Signature</span>
       <span className="mt-2 font-medium">{name || "—"}</span>
       <span className="text-[8px] text-gray-500">Printed Name</span>
@@ -88,15 +108,15 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
   const sigMap = new Map(wo.signatures?.map((s) => [s.role, s]) ?? []);
   const sigFum = sigMap.get("supervising_fumigator");
   const sigSup = sigMap.get("supplier_rep");
-  const sigCer = sigMap.get("certifying_officer");
+  const certified = wo.status === "certified";
+  const showPrinceSignature =
+    certified && Boolean(sigFum?.signerName && PRINCE_CHIWALO.test(sigFum.signerName));
 
   const certDate = wo.certifiedAt ? fmt(wo.certifiedAt) : "—";
 
-  // Primon address (hardcoded — always the contractor)
+  // Primon address (hardcoded — always the contractor; shown in Section 1)
   const PRIMON_ADDRESS =
     "PLOT 13/51, AFRICANA BUILDING, CAPITAL CITY,\nP.O BOX 31633, LILONGWE, MALAWI.";
-  const PRIMON_PHONE = "+265 (0) 1 754 432";
-  const PRIMON_EMAIL = "info@primonenterprises.com";
 
   return (
     <article
@@ -107,21 +127,14 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
       {/* ── HEADER ── */}
       <div className="border-b-2 border-primon-800 px-8 py-4">
         <div className="flex items-start justify-between gap-6">
-          {/* Left: logo + company */}
-          <div className="flex flex-col gap-1.5">
-            <Image
-              src="/Primon-logo.png"
+          {/* Left: logo (plain img so html2canvas captures it on PDF download) */}
+          <div className="flex items-start">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-no-bg.png"
               alt="Primon Enterprises Ltd"
-              width={160}
-              height={Math.round((160 * 242) / 858)}
-              className="object-contain"
-              priority
-              style={{ filter: "invert(1) sepia(1) saturate(3) hue-rotate(180deg)" }}
+              className="h-24 w-auto object-contain object-left"
             />
-            <p className="text-[7.5px] leading-4 text-gray-600 whitespace-pre-line">
-              {PRIMON_ADDRESS}
-              {"\n"}Tel: {PRIMON_PHONE} | Email: {PRIMON_EMAIL}
-            </p>
           </div>
 
           {/* Right: title + meta */}
@@ -163,7 +176,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
 
       {/* ── SECTION 1: PARTIES ── */}
       <section className="px-8 pt-3 pb-2">
-        <SectionTitle>1. Party Information</SectionTitle>
+        <SectionTitle>1. Supplier, Consignee &amp; Contractor</SectionTitle>
         <table className="w-full border-collapse text-[9px]">
           <tbody>
             <PartyRow
@@ -375,26 +388,22 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
       <section className="px-8 pb-4">
         <div className="flex items-start gap-4">
           {/* Signature blocks */}
-          <div className="flex flex-1 gap-6">
+          <div className="flex flex-1 gap-10">
             <SigBlock
               label="Supervising Fumigator"
               name={sigFum?.signerName ?? ""}
               date={sigFum?.signedAt ? fmt(sigFum.signedAt) : ""}
+              signatureSrc={showPrinceSignature ? "/signature.png" : undefined}
             />
             <SigBlock
               label="For the Supplier"
               name={sigSup?.signerName ?? ""}
               date={sigSup?.signedAt ? fmt(sigSup.signedAt) : ""}
             />
-            <SigBlock
-              label="Certifying Officer"
-              name={sigCer?.signerName ?? ""}
-              date={sigCer?.signedAt ? fmt(sigCer.signedAt) : ""}
-            />
           </div>
 
-          {/* QR code */}
-          {wo.verificationUrl && (
+          {/* QR code — minted at certification, same moment as Prince's signature */}
+          {certified && wo.verificationUrl && (
             <div className="flex flex-col items-center gap-1 shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

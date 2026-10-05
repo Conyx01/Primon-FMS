@@ -422,7 +422,7 @@ async function main() {
         signatures: {
           createMany: {
             data: [
-              { role: SignatureRole.supervising_fumigator, signerName: supervisor.name, signedAt: certifiedAt },
+              { role: SignatureRole.supervising_fumigator, signerName: 'Prince Chiwalo', signedAt: certifiedAt },
               { role: SignatureRole.supplier_rep, signerName: 'Hopeson Majiga', signedAt: certifiedAt },
               { role: SignatureRole.certifying_officer, signerName: opsManager.name, signedAt: certifiedAt },
             ],
@@ -486,7 +486,11 @@ async function main() {
         fumigationContractor: 'Primon Enterprises Limited',
       },
     })
-    console.log('ℹ️  Showcase FCC-PE-2026-000513 already exists — client/parties set to MidasCreed')
+    await prisma.signature.updateMany({
+      where: { fccId: existing513.id, role: SignatureRole.supervising_fumigator },
+      data: { signerName: 'Prince Chiwalo' },
+    })
+    console.log('ℹ️  Showcase FCC-PE-2026-000513 already exists — client/parties set to MidasCreed; supervising fumigator = Prince Chiwalo')
   }
 
   console.log('')
