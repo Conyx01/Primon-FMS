@@ -123,7 +123,14 @@ function NewWorkOrderWizard() {
   const [step, setStep] = useState(0);
 
   // Step 0 fields
-  const [client, setClient] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientOptions, setClientOptions] = useState<
+    { id: string; name: string; email: string }[]
+  >([]);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [cropType, setCropType] = useState<CropType>("tobacco");
   const [scale, setScale] = useState<"industrial" | "smallholder" | "household">("industrial");
   const [hasCode, setHasCode] = useState(false);
@@ -178,7 +185,8 @@ function NewWorkOrderWizard() {
         const p = data.submission?.payload;
         if (!p) return;
 
-        if (p.name) setClient(p.name);
+        if (p.name) setInviteName(p.name);
+        if (p.email) setInviteEmail(p.email);
         if (p.cropOrService) {
           setCropType(guessCropType(p.cropOrService));
           setScale(guessScale(p.cropOrService));
@@ -201,6 +209,59 @@ function NewWorkOrderWizard() {
     []
   );
 
+  const selectedClient = clientOptions.find((c) => c.id === clientId);
+  const clientLabel = selectedClient
+    ? `${selectedClient.name} (${selectedClient.email})`
+    : "";
+
+  // Load portal client users for attachment
+  useEffect(() => {
+    async function loadClients() {
+      try {
+        const res = await fetch("/api/users?role=client");
+        const data = await res.json();
+        if (res.ok) setClientOptions(data.users ?? []);
+      } catch {
+        // Wizard still usable; create will fail without a client
+      }
+    }
+    loadClients();
+  }, []);
+
+  async function inviteClient() {
+    if (!inviteName.trim() || !inviteEmail.trim()) return;
+    setInviteBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: inviteName.trim(),
+          email: inviteEmail.trim(),
+          role: "client",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to invite client");
+      const created = data.user as { id: string; name: string; email: string };
+      setClientOptions((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setClientId(created.id);
+      setInviteUrl(data.inviteUrl ?? null);
+      if (data.inviteUrl) {
+        await navigator.clipboard.writeText(data.inviteUrl);
+      }
+      setInviteName("");
+      setInviteEmail("");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to invite client");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
   const [si, setSi] = useState<ShippingInstructions>(emptySi);
 
   const [fumigationType, setFumigationType] = useState<FumigationType>("sheeted_stack");
@@ -220,6 +281,9 @@ function NewWorkOrderWizard() {
     setError(null);
 
     try {
+      if (!clientId) {
+        throw new Error("Select or invite a client so they can see this job in the portal.");
+      }
       // 1. Create Work Order + linked FCC draft
       const res = await fetch("/api/work-orders", {
         method: "POST",
@@ -233,6 +297,7 @@ function NewWorkOrderWizard() {
             : "auto_generated",
           cropType,
           scale,
+          clientId,
           salesOrderNo: salesOrderNo.trim() || undefined,
           shipmentNo: shipmentNo.trim() || undefined,
           deliveryNo: deliveryNo.trim() || undefined,
@@ -332,13 +397,55 @@ function NewWorkOrderWizard() {
           {step === 0 && (
             <div className="space-y-6 animate-reveal-up">
               <div>
-                <FormRow label="Client / supplier" required>
-                  <TextInput
-                    placeholder="e.g. Alliance One Tobacco Malawi Limited"
-                    value={client}
-                    onChange={(e) => setClient(e.target.value)}
-                  />
+                <FormRow label="Client (portal login)" required>
+                  <Select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                  >
+                    <option value="">Select a client…</option>
+                    {clientOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.email}
+                      </option>
+                    ))}
+                  </Select>
                 </FormRow>
+                <p className="mt-3 text-[11px] text-muted">
+                  The selected account is who sees this work order in /portal. Invite a new
+                  client if they do not have a login yet.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <FormRow label="Invite name">
+                    <TextInput
+                      value={inviteName}
+                      onChange={(e) => setInviteName(e.target.value)}
+                      placeholder="Company or contact"
+                    />
+                  </FormRow>
+                  <FormRow label="Invite email">
+                    <TextInput
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="shipping@client.com"
+                    />
+                  </FormRow>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={inviteClient}
+                      disabled={inviteBusy || !inviteName.trim() || !inviteEmail.trim()}
+                    >
+                      {inviteBusy ? "Inviting…" : "Invite & attach"}
+                    </Button>
+                  </div>
+                </div>
+                {inviteUrl && (
+                  <p className="mt-2 text-[11px] text-primon-800">
+                    Invite link copied. Send it to the client so they can set a password.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -610,7 +717,7 @@ function NewWorkOrderWizard() {
               <div>
                 <p className="text-xs text-muted">Work order</p>
                 <p className="mt-1 font-display text-lg text-primon-950">
-                  {hasCode && suppliedCode ? suppliedCode : autoCode} · {client || "Unnamed client"}
+                  {hasCode && suppliedCode ? suppliedCode : autoCode} · {clientLabel || "No client attached"}
                 </p>
                 <p className="mt-0.5 text-sm capitalize text-muted">
                   {cropType} · {scale}
@@ -656,7 +763,7 @@ function NewWorkOrderWizard() {
               Back
             </Button>
             {step < STEPS.length - 1 ? (
-              <Button onClick={next} disabled={step === 0 && !client}>
+              <Button onClick={next} disabled={step === 0 && !clientId}>
                 Continue
               </Button>
             ) : (

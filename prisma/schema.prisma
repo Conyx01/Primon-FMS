@@ -107,6 +107,8 @@ model User {
   loggedCorrectiveActions  CorrectiveAction[]      @relation("LoggedCorrectiveActions")
   notifications            Notification[]
   reviewedSubmissions      PendingSubmission[]     @relation("ReviewedSubmissions")
+  invites                  UserInvite[]            @relation("UserInvites")
+  createdInvites           UserInvite[]            @relation("CreatedInvites")
 
   @@map("users")
 }
@@ -385,6 +387,22 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model UserInvite {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  user      User @relation("UserInvites", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User @relation("CreatedInvites", fields: [createdById], references: [id])
+
+  @@index([userId])
+  @@map("user_invites")
 }
 
 model AuditLog {

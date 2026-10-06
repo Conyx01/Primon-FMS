@@ -15,6 +15,7 @@ interface UseNotificationsReturn {
   notifications: AppNotification[];
   unreadCount: number;
   isLoading: boolean;
+  markRead: (ids: string[]) => Promise<void>;
   markAllRead: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -40,7 +41,27 @@ export function useNotifications(): UseNotificationsReturn {
 
   useEffect(() => {
     refresh();
+    const id = window.setInterval(refresh, 45_000);
+    return () => window.clearInterval(id);
   }, [refresh]);
+
+  const markRead = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const now = new Date().toISOString();
+    setNotifications((prev) =>
+      prev.map((n) => (ids.includes(n.id) && !n.readAt ? { ...n, readAt: now } : n))
+    );
+    setUnreadCount((c) => Math.max(0, c - ids.length));
+    try {
+      await fetch("/api/notifications/mark-read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+    } catch {
+      // Count will resync on next refresh
+    }
+  }, []);
 
   const markAllRead = useCallback(async () => {
     try {
@@ -52,7 +73,7 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, []);
 
-  return { notifications, unreadCount, isLoading, markAllRead, refresh };
+  return { notifications, unreadCount, isLoading, markRead, markAllRead, refresh };
 }
 
 // ── Notification message helpers ──────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -10,9 +11,9 @@ import {
   Boxes,
   Inbox,
   Users,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDemo } from "@/lib/store";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUI } from "@/lib/ui-context";
 
@@ -23,14 +24,34 @@ const nav = [
   { href: "/dashboard/inventory", label: "Fumigant stock", icon: Boxes, allowedRoles: ["admin"] },
   { href: "/dashboard/intake", label: "Website intake", icon: Inbox, allowedRoles: ["admin", "ops_manager"] },
   { href: "/dashboard/household", label: "Household clients", icon: Users, allowedRoles: ["admin", "ops_manager"] },
+  { href: "/dashboard/users", label: "Users", icon: UserCog, allowedRoles: ["admin"] },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { workOrders } = useDemo();
   const { role } = useCurrentUser();
   const { isMobileNavOpen, setIsMobileNavOpen } = useUI();
-  const flaggedCount = workOrders.filter((w) => w.status === "flagged").length;
+  const [flaggedCount, setFlaggedCount] = useState(0);
+
+  useEffect(() => {
+    if (role === "client" || role === "executive" || !role) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch("/api/fccs/flagged-count");
+        const data = await res.json();
+        if (!cancelled && res.ok) setFlaggedCount(Number(data.count) || 0);
+      } catch {
+        // keep last known count
+      }
+    }
+    load();
+    const id = window.setInterval(load, 45_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [role]);
 
   if (role === "client" || role === "executive") {
     return null; // Clients and Executives don't see the dashboard sidebar

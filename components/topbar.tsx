@@ -33,10 +33,23 @@ function NotifIcon({ type }: { type: string }) {
 
 // ── Notification row ─────────────────────────────────────────────────────────
 
-function NotifRow({ n, onClose }: { n: AppNotification; onClose: () => void }) {
+function NotifRow({
+  n,
+  onClose,
+  onOpen,
+}: {
+  n: AppNotification;
+  onClose: () => void;
+  onOpen: (id: string) => void;
+}) {
   const href = notificationHref(n.type, n.payload);
   const label = notificationLabel(n.type, n.payload);
   const isUnread = !n.readAt;
+
+  function handleOpen() {
+    if (isUnread) onOpen(n.id);
+    onClose();
+  }
 
   const inner = (
     <div
@@ -60,12 +73,12 @@ function NotifRow({ n, onClose }: { n: AppNotification; onClose: () => void }) {
 
   if (href) {
     return (
-      <Link href={href} onClick={onClose}>
+      <Link href={href} onClick={handleOpen}>
         {inner}
       </Link>
     );
   }
-  return <div>{inner}</div>;
+  return <div onClick={handleOpen}>{inner}</div>;
 }
 
 // ── Topbar ───────────────────────────────────────────────────────────────────
@@ -82,7 +95,7 @@ export function Topbar({
   const { user, role, isLoading } = useCurrentUser();
   const router = useRouter();
   const { setIsMobileNavOpen } = useUI();
-  const { notifications, unreadCount, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -170,7 +183,12 @@ export function Topbar({
                   </div>
                 ) : (
                   notifications.map((n) => (
-                    <NotifRow key={n.id} n={n} onClose={() => setOpen(false)} />
+                    <NotifRow
+                      key={n.id}
+                      n={n}
+                      onClose={() => setOpen(false)}
+                      onOpen={(id) => { void markRead([id]); }}
+                    />
                   ))
                 )}
               </div>
