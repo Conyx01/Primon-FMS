@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { PrimonLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Label, TextInput } from "@/components/ui/input";
@@ -106,6 +107,12 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <Link
+                href="/forgot-password"
+                className="mt-1.5 inline-block text-[11px] text-primon-700 hover:text-primon-950"
+              >
+                Forgot password?
+              </Link>
             </div>
 
             <Button size="lg" className="mt-6 w-full" type="submit" disabled={loading}>

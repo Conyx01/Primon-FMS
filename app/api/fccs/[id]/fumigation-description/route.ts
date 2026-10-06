@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FumigationType, StockMovementType } from "@prisma/client";
+import { notifyLowStockIfCrossed } from "@/lib/notify-low-stock";
 
 export async function POST(
   req: NextRequest,
@@ -131,60 +132,106 @@ async function handleFumigationDescriptionSave(
       );
     }
 
+    const switchedFormulation = Boolean(
+      existingDesc && existingDesc.formulationId !== formulation.id
+    );
+    let oldFormulation: {
+      id: string;
+      name: string;
+      unit: string;
+      stockLevel: { id: string; quantityOnHand: number; lowStockThreshold: number } | null;
+    } | null = null;
+    if (switchedFormulation && existingDesc) {
+      oldFormulation = await prisma.formulation.findUnique({
+        where: { id: existingDesc.formulationId },
+        include: { stockLevel: true },
+      });
+    }
+
     // Atomic transaction for description save, stock deduction, and status update
     const result = await prisma.$transaction(async (tx) => {
-      let deltaDeduction = totalUsedG;
-
-      if (existingDesc) {
-        deltaDeduction = totalUsedG - existingDesc.totalFumigantUsedG;
-      }
-
-      if (deltaDeduction > 0) {
-        if (stockLevel.quantityOnHand < deltaDeduction) {
-          throw new Error(
-            `Insufficient stock for formulation ${formulation.name}. Required: ${deltaDeduction}${formulation.unit}, Available: ${stockLevel.quantityOnHand}${formulation.unit}`
-          );
+      if (switchedFormulation && existingDesc) {
+        const refund = existingDesc.totalFumigantUsedG;
+        if (oldFormulation?.stockLevel && refund > 0) {
+          await tx.stockLevel.update({
+            where: { id: oldFormulation.stockLevel.id },
+            data: { quantityOnHand: { increment: refund } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              formulationId: oldFormulation.id,
+              workOrderId: fcc.workOrderId,
+              type: StockMovementType.addition,
+              quantity: refund,
+              note: `Stock returned on formulation change (FCC ${fcc.id})`,
+              performedById: session.dbUser.id,
+            },
+          });
+        }
+        if (totalUsedG > 0) {
+          if (stockLevel.quantityOnHand < totalUsedG) {
+            throw new Error(
+              `Insufficient stock for formulation ${formulation.name}. Required: ${totalUsedG}${formulation.unit}, Available: ${stockLevel.quantityOnHand}${formulation.unit}`
+            );
+          }
+          await tx.stockLevel.update({
+            where: { id: stockLevel.id },
+            data: { quantityOnHand: { decrement: totalUsedG } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              formulationId: formulation.id,
+              workOrderId: fcc.workOrderId,
+              type: StockMovementType.deduction,
+              quantity: totalUsedG,
+              note: `Stock deducted on formulation change (FCC ${fcc.id})`,
+              performedById: session.dbUser.id,
+            },
+          });
+        }
+      } else {
+        let deltaDeduction = totalUsedG;
+        if (existingDesc) {
+          deltaDeduction = totalUsedG - existingDesc.totalFumigantUsedG;
         }
 
-        // Deduct from stock
-        await tx.stockLevel.update({
-          where: { id: stockLevel.id },
-          data: {
-            quantityOnHand: { decrement: deltaDeduction },
-          },
-        });
-
-        // Record stock movement
-        await tx.stockMovement.create({
-          data: {
-            formulationId: formulation.id,
-            workOrderId: fcc.workOrderId,
-            type: StockMovementType.deduction,
-            quantity: deltaDeduction,
-            note: `Stock deducted on fumigation description save (FCC ${fcc.id})`,
-            performedById: session.dbUser.id,
-          },
-        });
-      } else if (deltaDeduction < 0) {
-        // Return difference back to stock
-        const refundAmount = Math.abs(deltaDeduction);
-        await tx.stockLevel.update({
-          where: { id: stockLevel.id },
-          data: {
-            quantityOnHand: { increment: refundAmount },
-          },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            formulationId: formulation.id,
-            workOrderId: fcc.workOrderId,
-            type: StockMovementType.addition,
-            quantity: refundAmount,
-            note: `Stock adjusted on fumigation description update (FCC ${fcc.id})`,
-            performedById: session.dbUser.id,
-          },
-        });
+        if (deltaDeduction > 0) {
+          if (stockLevel.quantityOnHand < deltaDeduction) {
+            throw new Error(
+              `Insufficient stock for formulation ${formulation.name}. Required: ${deltaDeduction}${formulation.unit}, Available: ${stockLevel.quantityOnHand}${formulation.unit}`
+            );
+          }
+          await tx.stockLevel.update({
+            where: { id: stockLevel.id },
+            data: { quantityOnHand: { decrement: deltaDeduction } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              formulationId: formulation.id,
+              workOrderId: fcc.workOrderId,
+              type: StockMovementType.deduction,
+              quantity: deltaDeduction,
+              note: `Stock deducted on fumigation description save (FCC ${fcc.id})`,
+              performedById: session.dbUser.id,
+            },
+          });
+        } else if (deltaDeduction < 0) {
+          const refundAmount = Math.abs(deltaDeduction);
+          await tx.stockLevel.update({
+            where: { id: stockLevel.id },
+            data: { quantityOnHand: { increment: refundAmount } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              formulationId: formulation.id,
+              workOrderId: fcc.workOrderId,
+              type: StockMovementType.addition,
+              quantity: refundAmount,
+              note: `Stock adjusted on fumigation description update (FCC ${fcc.id})`,
+              performedById: session.dbUser.id,
+            },
+          });
+        }
       }
 
       // Upsert Fumigation Description
@@ -247,13 +294,43 @@ async function handleFumigationDescriptionSave(
             doseGm3: dose,
             totalVolumeM3: volume,
             totalFumigantUsedG: totalUsedG,
-            stockDeducted: deltaDeduction,
+            formulationChanged: switchedFormulation,
           },
         },
       });
 
       return { fumigationDescription: desc, fcc: updatedFcc };
     });
+
+    const refreshed = await prisma.stockLevel.findUnique({
+      where: { id: stockLevel.id },
+      include: { formulation: true },
+    });
+    if (refreshed) {
+      await notifyLowStockIfCrossed({
+        previousQty: stockLevel.quantityOnHand,
+        newQty: refreshed.quantityOnHand,
+        threshold: refreshed.lowStockThreshold,
+        formulationName: refreshed.formulation.name,
+        formulationId: refreshed.formulationId,
+      });
+    }
+
+    if (oldFormulation?.stockLevel) {
+      const oldRefreshed = await prisma.stockLevel.findUnique({
+        where: { id: oldFormulation.stockLevel.id },
+        include: { formulation: true },
+      });
+      if (oldRefreshed) {
+        await notifyLowStockIfCrossed({
+          previousQty: oldFormulation.stockLevel.quantityOnHand,
+          newQty: oldRefreshed.quantityOnHand,
+          threshold: oldRefreshed.lowStockThreshold,
+          formulationName: oldRefreshed.formulation.name,
+          formulationId: oldRefreshed.formulationId,
+        });
+      }
+    }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: any) {

@@ -346,8 +346,7 @@ async function main() {
   const aerationCompleted = new Date('2026-10-10T16:00:00Z')
   const certifiedAt = new Date('2026-10-10T17:00:00Z')
   const cert513 = 'FCC-PE-2026-000513'
-  // Temporary public origin until fms.primonenterprises.com DNS is live
-  const publicOrigin = 'https://primon-fms.vercel.app'
+  const publicOrigin = 'https://fms.primonenterprises.com'
   const verify513 = `${publicOrigin}/verify/${cert513}`
 
   const workOrder513 = await prisma.workOrder.upsert({
@@ -496,7 +495,7 @@ async function main() {
       where: { id: existing513.id },
       data: { verificationUrl: verify513, qrCodeUrl: verify513 },
     })
-    console.log('ℹ️  Showcase FCC-PE-2026-000513 already exists — verify URL set to primon-fms.vercel.app')
+    console.log('ℹ️  Showcase FCC-PE-2026-000513 already exists — verify URL set to fms.primonenterprises.com')
   }
 
   const staleVerify = await prisma.fCC.findMany({
@@ -505,6 +504,8 @@ async function main() {
       OR: [
         { verificationUrl: { contains: 'localhost' } },
         { qrCodeUrl: { contains: 'localhost' } },
+        { verificationUrl: { contains: 'primon-fms.vercel.app' } },
+        { qrCodeUrl: { contains: 'primon-fms.vercel.app' } },
       ],
     },
     select: { id: true, certificateNumber: true },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { StockMovementType } from "@prisma/client";
+import { notifyLowStockIfCrossed } from "@/lib/notify-low-stock";
 
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
@@ -123,6 +124,14 @@ export async function POST(req: NextRequest) {
       });
 
       return { stockLevel: updatedStockLevel, movement };
+    });
+
+    await notifyLowStockIfCrossed({
+      previousQty: currentOnHand,
+      newQty: result.stockLevel.quantityOnHand,
+      threshold: existingStockLevel.lowStockThreshold,
+      formulationName: existingStockLevel.formulation.name,
+      formulationId: existingStockLevel.formulationId,
     });
 
     return NextResponse.json(result, { status: 200 });

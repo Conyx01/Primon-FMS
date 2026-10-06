@@ -28,17 +28,10 @@ BETTER_AUTH_SECRET="<output of: node -e \"console.log(require('crypto').randomBy
 BETTER_AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-# ── Required on Vercel (set in project settings) ──────────────────────────────
-# Until fms.primonenterprises.com DNS is live, use the Vercel URL:
-# BETTER_AUTH_URL="https://primon-fms.vercel.app"
-# NEXT_PUBLIC_APP_URL="https://primon-fms.vercel.app"
-
-# ── Set when custom domain is ready ──────────────────────────────────────────
+# ── Required on Vercel ────────────────────────────────────────────────────────
 # BETTER_AUTH_URL="https://fms.primonenterprises.com"
 # NEXT_PUBLIC_APP_URL="https://fms.primonenterprises.com"
-# NEXT_PUBLIC_VERIFY_ORIGIN="https://fms.primonenterprises.com"
-# (NEXT_PUBLIC_VERIFY_ORIGIN switches QR paths to /fcc/{number} — leave unset
-#  while using /verify/{number} on primon-fms.vercel.app)
+# Leave NEXT_PUBLIC_VERIFY_ORIGIN unset (QR uses /verify/{number} on this host).
 
 # ── Set when Resend account is configured (Phase 9/10) ───────────────────────
 # RESEND_API_KEY="re_..."

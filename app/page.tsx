@@ -72,7 +72,7 @@ export default function LandingPage() {
               <p className="mt-4 font-display text-[15px] text-primon-950">
                 Fumigation Conformance Certificate
               </p>
-              <p className="text-xs text-muted">FCC-2026-000512</p>
+              <p className="text-xs text-muted">FCC-PE-2026-000513</p>
 
               <div className="mt-5 space-y-3 text-xs">
                 <div className="flex justify-between border-b border-dashed border-border pb-2">
@@ -100,7 +100,7 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <p className="text-[11px] font-medium text-primon-900">Scan to verify</p>
-                  <p className="text-[10px] text-muted">verify.primon.mw/fcc/FCC-2026-000512</p>
+                  <p className="text-[10px] text-muted">fms.primonenterprises.com/verify/FCC-PE-2026-000513</p>
                 </div>
               </div>
             </div>

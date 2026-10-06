@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/stepper";
 import { FormRow, Label, Select, TextInput } from "@/components/ui/input";
-import { useDemo } from "@/lib/store";
 import { availableFormulations, FUMIGANTS } from "@/lib/fumigants";
 import { cn } from "@/lib/utils";
 import {
@@ -16,7 +15,17 @@ import {
   FumigantName,
   FumigationType,
   ShippingInstructions,
+  StockFormulation,
 } from "@/lib/types";
+
+function toFumigantName(name: string): FumigantName {
+  return /magnesium/i.test(name) ? "Magnesium Phosphide" : "Aluminium Phosphide";
+}
+
+function toCropType(value: string): CropType | "both" {
+  if (value === "grain" || value === "both") return value;
+  return "tobacco";
+}
 
 const STEPS = ["Work order", "Shipping instructions", "Fumigation description", "Review"];
 
@@ -119,7 +128,6 @@ function NewWorkOrderWizard() {
   const searchParams = useSearchParams();
   const fromSubmissionId = searchParams.get("fromSubmission");
 
-  const { stock: demoStock } = useDemo();
   const [step, setStep] = useState(0);
 
   // Step 0 fields
@@ -144,7 +152,7 @@ function NewWorkOrderWizard() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stock, setStock] = useState(demoStock);
+  const [stock, setStock] = useState<StockFormulation[]>([]);
 
   // Load live stock
   useEffect(() => {
@@ -154,15 +162,27 @@ function NewWorkOrderWizard() {
         if (res.ok) {
           const data = await res.json();
           if (data.stockLevels && data.stockLevels.length > 0) {
-            const mapped = data.stockLevels.map((s: { id: string; quantityOnHand: number; lowStockThreshold: number; formulation: { name: string; fumigant: { name: string }; cropType: string; unit: string } }) => ({
-              id: s.id,
-              formulation: s.formulation.name,
-              fumigant: s.formulation.fumigant.name,
-              cropType: s.formulation.cropType,
-              unit: s.formulation.unit,
-              quantityOnHand: s.quantityOnHand,
-              lowStockThreshold: s.lowStockThreshold,
-            }));
+            const mapped: StockFormulation[] = data.stockLevels.map(
+              (s: {
+                id: string;
+                quantityOnHand: number;
+                lowStockThreshold: number;
+                formulation: {
+                  name: string;
+                  fumigant: { name: string };
+                  cropType: string;
+                  unit: string;
+                };
+              }) => ({
+                id: s.id,
+                formulation: s.formulation.name,
+                fumigant: toFumigantName(s.formulation.fumigant.name),
+                cropType: toCropType(s.formulation.cropType),
+                unit: s.formulation.unit,
+                quantityOnHand: s.quantityOnHand,
+                lowStockThreshold: s.lowStockThreshold,
+              })
+            );
             setStock(mapped);
           }
         }

@@ -1,7 +1,11 @@
-/** Public origin of the FMS app (Vercel today, custom domain later). */
+/** Canonical production origin now that DNS is live. */
+export const CANONICAL_PUBLIC_ORIGIN = "https://fms.primonenterprises.com";
+
+/** Public origin of the FMS app. */
 export function getPublicOrigin(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
   if (explicit) return explicit;
+  if (process.env.NODE_ENV === "production") return CANONICAL_PUBLIC_ORIGIN;
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
@@ -13,8 +17,8 @@ export function getPublicOrigin(): string {
 
 /**
  * QR / printed verification URL for a certified FCC number.
- * Until verify.primon.mw exists, this is /verify/{FCC-…} on the current host.
- * Set NEXT_PUBLIC_VERIFY_ORIGIN=https://verify.primon.mw to switch to /fcc/{FCC-…}.
+ * Default: {origin}/verify/{FCC-PE-…} on fms.primonenterprises.com.
+ * Set NEXT_PUBLIC_VERIFY_ORIGIN only if a dedicated verify host uses /fcc/{number}.
  */
 export function verificationUrl(certificateNumber: string): string {
   const dedicated = process.env.NEXT_PUBLIC_VERIFY_ORIGIN?.trim().replace(/\/$/, "");

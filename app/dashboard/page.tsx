@@ -9,11 +9,9 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
 import { TextInput, Select } from "@/components/ui/input";
-import { useDemo } from "@/lib/store";
 import { formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { workOrders: demoWorkOrders, stock: demoStock } = useDemo();
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [stockLevels, setStockLevels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

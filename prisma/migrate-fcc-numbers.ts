@@ -19,7 +19,7 @@ function buildVerificationUrl(certNumber: string): string {
   const base =
     process.env.NEXT_PUBLIC_APP_URL ??
     process.env.VERCEL_URL ??
-    "https://primon-fms.vercel.app";
+    "https://fms.primonenterprises.com";
   return `${base}/verify/${encodeURIComponent(certNumber)}`;
 }
 

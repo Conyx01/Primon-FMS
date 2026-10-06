@@ -9,7 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GasDayGauge } from "@/components/gas-day-gauge";
 import { FccStatusPill } from "@/components/ui/status-pill";
-import { FormRow, Label, TextInput } from "@/components/ui/input";
+import { FormRow, Label, TextInput, Select } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/kpi";
 import { GasReading, FccStatus } from "@/lib/types";
 import { LETHAL_THRESHOLD } from "@/lib/status";
@@ -35,7 +35,11 @@ type ApiReading = {
 type FccPayload = {
   id: string;
   status: FccStatus;
-  workOrder: { id: string; code: string; client?: { name: string } | null };
+  workOrder: {
+    id: string;
+    code: string;
+    client?: { id: string; name: string; email: string } | null;
+  };
   fumigationDescription?: {
     fumigationType: string;
     fumigant?: { name: string };
@@ -81,6 +85,7 @@ function toLocalInput(value: string | null | undefined): string {
 export default function MonitorDetailPage({ params }: { params: { id: string } }) {
   const { role } = useCurrentUser();
   const canIssueCert = role === "ops_manager" || role === "admin";
+  const canAttachClient = role === "ops_manager" || role === "admin";
   const [fcc, setFcc] = useState<FccPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,12 +112,17 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     supplier_rep: "",
     certifying_officer: "",
   });
+  const [clientOptions, setClientOptions] = useState<
+    { id: string; name: string; email: string }[]
+  >([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/fccs/${params.id}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to load FCC");
     setFcc(data.fcc);
+    setSelectedClientId(data.fcc.workOrder?.client?.id ?? "");
     const closeout = data.fcc.closeout;
     if (closeout) {
       setDatePlaced(toLocalInput(closeout.datePlaced));
@@ -142,6 +152,23 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     };
   }, [load]);
 
+  useEffect(() => {
+    if (!canAttachClient) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/users?role=client");
+        const data = await res.json();
+        if (!cancelled && res.ok) setClientOptions(data.users ?? []);
+      } catch {
+        // non-blocking
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canAttachClient]);
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3200);
@@ -163,6 +190,30 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     fcc?.closeout?.aerationBegan && fcc?.closeout?.aerationCompleted
   );
   const canCertify = allResolved && closeoutComplete && fcc?.status !== "certified";
+
+  async function saveClientAttach() {
+    if (!fcc) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/work-orders/${fcc.workOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: selectedClientId || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to attach client");
+      await load();
+      showToast(
+        selectedClientId
+          ? "Client attached — they will see this job in the portal."
+          : "Client unassigned from this work order."
+      );
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to attach client");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function recordDatePlaced() {
     if (!datePlaced) return;
@@ -401,6 +452,33 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               </p>
             </div>
           </div>
+          {canAttachClient && (
+            <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-border pt-5">
+              <div className="min-w-[220px] flex-1">
+                <FormRow label="Portal client">
+                  <Select
+                    value={selectedClientId}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
+                  >
+                    <option value="">Not attached</option>
+                    {clientOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.email}
+                      </option>
+                    ))}
+                  </Select>
+                </FormRow>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={saveClientAttach}
+                disabled={saving}
+              >
+                Save client
+              </Button>
+            </div>
+          )}
         </Card>
 
         {!fcc.closeout && (

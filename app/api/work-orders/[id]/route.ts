@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
-import { CropType, Scale } from "@prisma/client";
+import { CropType, Role, Scale } from "@prisma/client";
 
 export async function GET(
   req: NextRequest,
@@ -108,6 +108,19 @@ export async function PATCH(
 
     if (!existing) {
       return NextResponse.json({ error: "Work Order not found" }, { status: 404 });
+    }
+
+    if (clientId) {
+      const client = await prisma.user.findUnique({
+        where: { id: clientId },
+        select: { id: true, role: true },
+      });
+      if (!client || client.role !== Role.client) {
+        return NextResponse.json(
+          { error: "Selected user is not a portal client" },
+          { status: 400 }
+        );
+      }
     }
 
     const updated = await prisma.workOrder.update({
