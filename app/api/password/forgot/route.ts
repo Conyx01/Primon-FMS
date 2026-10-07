@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
           to: user.email,
           name: user.name,
           inviteUrl: invite.inviteUrl,
+          kind: "reset",
         });
       }
     } catch (error: unknown) {

@@ -15,7 +15,7 @@ A full-stack application built for Primon Enterprises Limited to manage fumigati
 | Testing | Vitest |
 | Deployment | Vercel |
 | Cron jobs | Vercel Cron (`vercel.json`) |
-| Email *(pending)* | Resend |
+| Email | Resend (invite + password reset) |
 
 ## Environment Variables
 
@@ -33,9 +33,9 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 # NEXT_PUBLIC_APP_URL="https://fms.primonenterprises.com"
 # Leave NEXT_PUBLIC_VERIFY_ORIGIN unset (QR uses /verify/{number} on this host).
 
-# ── Set when Resend account is configured (Phase 9/10) ───────────────────────
+# ── Resend (invite + password reset). Domain must be verified. ───────────────
 # RESEND_API_KEY="re_..."
-# (household reminder emails + staff notifications via email)
+# EMAIL_FROM="Primon FMS <noreply@mail.primonenterprises.com>"
 ```
 
 > **Secrets that are NOT needed** (removed from earlier design):
@@ -147,7 +147,7 @@ FCC / WO number generation, and intake pre-fill field inference.
 
 | Item | Blocker |
 |---|---|
-| Phase 9.2–9.7 — email notifications | `RESEND_API_KEY` + verified sending domain |
+| Phase 9.2–9.7 — remaining in-app email types | Resend live for invites/reset; expand as needed |
 | Phase 10.2/10.4 — household reminder emails | Same |
 | `NEXT_PUBLIC_VERIFY_ORIGIN` | `verify.primon.mw` DNS delegation |
 | Executive dashboard | SDD open item — Ops decision needed |

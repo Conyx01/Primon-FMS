@@ -463,7 +463,8 @@ function NewWorkOrderWizard() {
                 </div>
                 {inviteUrl && (
                   <p className="mt-2 text-[11px] text-primon-800">
-                    Invite link copied. Send it to the client so they can set a password.
+                    Client invited. Check that they received the email; the set-password link was
+                    also copied as a backup.
                   </p>
                 )}
               </div>

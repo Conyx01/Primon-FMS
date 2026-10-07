@@ -33,8 +33,8 @@ export default function ForgotPasswordPage() {
         <h1 className="mt-8 font-display text-2xl text-primon-950">Reset your password</h1>
         {sent ? (
           <p className="mt-3 text-sm text-muted">
-            If that email has an account, an invite link was issued. Check email when Resend is
-            connected, or ask an Admin to copy a new invite from Users.
+            If that email has an account, a reset link has been sent. Check your inbox, or ask an
+            Admin to issue a new invite from Users.
           </p>
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-4">

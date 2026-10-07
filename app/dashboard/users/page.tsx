@@ -57,11 +57,6 @@ export default function UsersPage() {
     load();
   }, [load]);
 
-  async function copy(text: string) {
-    await navigator.clipboard.writeText(text);
-    setInviteBanner("Invite link copied. Send it to the user — they set their own password.");
-  }
-
   async function createUser(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -75,8 +70,12 @@ export default function UsersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create user");
       setForm({ name: "", email: "", role: "client" });
-      if (data.inviteUrl) await copy(data.inviteUrl);
-      else setInviteBanner("User created. Email send is pending Resend.");
+      if (data.inviteUrl) await navigator.clipboard.writeText(data.inviteUrl);
+      setInviteBanner(
+        data.emailSent
+          ? `Invite emailed to ${form.email}. The link was also copied (expires in 7 days).`
+          : "Email did not send. Invite link copied — send it to the user so they can set a password."
+      );
       await load();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create user");
@@ -92,7 +91,12 @@ export default function UsersPage() {
       const res = await fetch(`/api/users/${id}/invite`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to issue invite");
-      if (data.inviteUrl) await copy(data.inviteUrl);
+      if (data.inviteUrl) await navigator.clipboard.writeText(data.inviteUrl);
+      setInviteBanner(
+        data.emailSent
+          ? "New invite emailed. The link was also copied (expires in 7 days)."
+          : "Email did not send. New invite link copied — send it to the user so they can set a password."
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to issue invite");
     } finally {
@@ -162,13 +166,13 @@ export default function UsersPage() {
             <div className="flex items-end">
               <Button type="submit" disabled={busy}>
                 <Plus className="h-3.5 w-3.5" />
-                Create & copy invite
+                Create & invite
               </Button>
             </div>
           </form>
           <p className="mt-3 text-[11px] text-muted">
-            Until Resend is connected, copy the invite link and send it on WhatsApp or email yourself.
-            The link expires in 7 days.
+            An invite email is sent from noreply@mail.primonenterprises.com. The link is also copied
+            as a backup. It expires in 7 days. No password is included in the email.
           </p>
         </Card>
 
