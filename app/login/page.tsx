@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PrimonLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("deactivated")) {
+      setError("This account has been deactivated. Contact an Admin.");
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +41,16 @@ export default function LoginPage() {
       }
 
       const session = await authClient.getSession();
-      const role = session?.data?.user?.role;
+      const sessionUser = session?.data?.user as
+        | { role?: string; deactivatedAt?: string | Date | null }
+        | undefined;
+      if (sessionUser?.deactivatedAt) {
+        await authClient.signOut();
+        setError("This account has been deactivated. Contact an Admin.");
+        setLoading(false);
+        return;
+      }
+      const role = sessionUser?.role;
 
       if (role === "client") {
         router.push("/portal");

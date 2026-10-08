@@ -78,7 +78,14 @@ export function useNotifications(): UseNotificationsReturn {
 
 // ── Notification message helpers ──────────────────────────────────────────────
 
-export function notificationLabel(type: string, payload: Record<string, unknown>): string {
+export function notificationLabel(
+  type: string,
+  payload: Record<string, unknown>,
+  opts?: { portal?: boolean }
+): string {
+  if (opts?.portal && type === "fcc_certified") {
+    return `${payload.certificateNumber ?? "Your certificate"} is ready to view and download`;
+  }
   switch (type) {
     case "critical_gas_reading":
       return `Critical reading on Day ${payload.dayNumber ?? "?"} — action required`;
@@ -93,7 +100,18 @@ export function notificationLabel(type: string, payload: Record<string, unknown>
   }
 }
 
-export function notificationHref(type: string, payload: Record<string, unknown>): string | null {
+export function notificationHref(
+  type: string,
+  payload: Record<string, unknown>,
+  opts?: { portal?: boolean }
+): string | null {
+  if (opts?.portal) {
+    if (type === "fcc_certified") {
+      const id = payload.workOrderId ?? payload.fccId;
+      return id ? `/portal/${id}` : "/portal/certificates";
+    }
+    return null;
+  }
   switch (type) {
     case "critical_gas_reading":
       return payload.workOrderId ? `/dashboard/monitor/${payload.workOrderId}` : "/dashboard/monitor";

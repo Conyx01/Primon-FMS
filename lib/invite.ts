@@ -38,9 +38,10 @@ export async function findValidInvite(token: string) {
   const tokenHash = hashInviteToken(token);
   const invite = await prisma.userInvite.findUnique({
     where: { tokenHash },
-    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    include: { user: { select: { id: true, name: true, email: true, role: true, deactivatedAt: true } } },
   });
   if (!invite || invite.usedAt) return null;
+  if (invite.user.deactivatedAt) return null;
   if (invite.expiresAt.getTime() < Date.now()) return null;
   return invite;
 }

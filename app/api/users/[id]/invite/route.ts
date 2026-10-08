@@ -17,10 +17,16 @@ export async function POST(
   const { id } = await params;
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, name: true, email: true, role: true },
+    select: { id: true, name: true, email: true, role: true, deactivatedAt: true },
   });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+  if (user.deactivatedAt) {
+    return NextResponse.json(
+      { error: "Reactivate this account before sending an invite." },
+      { status: 400 }
+    );
   }
 
   const invite = await issueInvite(user.id, session.dbUser.id);

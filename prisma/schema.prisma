@@ -89,9 +89,10 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  role          Role      @default(supervisor)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  role           Role      @default(supervisor)
+  deactivatedAt  DateTime?
 
   // Better-Auth Relations
   sessions      Session[]

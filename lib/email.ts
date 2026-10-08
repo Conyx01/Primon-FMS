@@ -41,7 +41,7 @@ function brandedInviteHtml(args: {
   const copy = inviteCopy(args.kind, args.name);
   const safeName = escapeHtml(args.name);
   const safeUrl = escapeHtml(args.inviteUrl);
-  const logoSrc = `${args.origin}/logo-no-bg.png`;
+  const logoSrc = `${args.origin}/Primon-logo.png`;
   const intro = `Hello ${safeName},`;
   const body =
     args.kind === "reset"

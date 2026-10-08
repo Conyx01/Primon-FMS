@@ -34,6 +34,27 @@ export const auth = betterAuth({
         defaultValue: "supervisor",
         input: false,
       },
+      deactivatedAt: {
+        type: "date",
+        required: false,
+        input: false,
+      },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        before: async (session) => {
+          const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { deactivatedAt: true },
+          });
+          if (user?.deactivatedAt) {
+            throw new Error("This account has been deactivated.");
+          }
+          return { data: session };
+        },
+      },
     },
   },
 });

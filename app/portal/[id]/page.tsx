@@ -6,6 +6,10 @@ import { ArrowLeft } from "lucide-react";
 import { CertificateView } from "@/components/certificate-view";
 import { DownloadCertificateButton } from "@/components/download-certificate-button";
 import { EmptyState } from "@/components/ui/kpi";
+import { Card } from "@/components/ui/card";
+import { FccStatusPill } from "@/components/ui/status-pill";
+import { PortalReadingStrip, clientStatusSummary } from "@/components/portal-progress";
+import { PortalTopbar } from "@/components/portal-topbar";
 import { certificateFilename } from "@/lib/download-certificate";
 import { mapFccToWorkOrder } from "@/lib/map-fcc";
 import type { WorkOrder } from "@/lib/types";
@@ -40,14 +44,30 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
   }, [params.id]);
 
   if (error) {
-    return <EmptyState title="Not found" description={error} />;
+    return (
+      <div>
+        <PortalTopbar title="Shipment" />
+        <div className="px-6 py-8 lg:px-10">
+          <EmptyState title="Not found" description={error} />
+        </div>
+      </div>
+    );
   }
   if (!wo) {
-    return <p className="text-sm text-muted">Loading…</p>;
+    return (
+      <div>
+        <PortalTopbar title="Shipment" />
+        <div className="px-6 py-8 lg:px-10">
+          <p className="text-sm text-muted">Loading…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div>
+      <PortalTopbar title={wo.code} description={wo.certificateNumber} />
+      <div className="px-6 py-8 lg:px-10">
       <div className="no-print mb-6 flex items-center justify-between">
         <Link
           href="/portal"
@@ -64,7 +84,21 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
         )}
       </div>
 
+      <Card className="mb-8 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-display text-xl text-primon-950">{wo.code}</p>
+            <p className="mt-1 max-w-xl text-sm text-muted">{clientStatusSummary(wo.status)}</p>
+          </div>
+          <FccStatusPill status={wo.status} />
+        </div>
+        <div className="mt-5">
+          <PortalReadingStrip readings={wo.readings} />
+        </div>
+      </Card>
+
       <CertificateView ref={sheetRef} workOrder={wo} />
+      </div>
     </div>
   );
 }

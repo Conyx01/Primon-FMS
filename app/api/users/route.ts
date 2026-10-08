@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
         email: true,
         role: true,
         createdAt: true,
+        deactivatedAt: true,
         _count: { select: { clientWorkOrders: true } },
       },
     });
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   if (STAFF_CAN_LIST_CLIENTS.has(actor) && roleFilter === Role.client) {
     const users = await prisma.user.findMany({
-      where: { role: Role.client },
+      where: { role: Role.client, deactivatedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true, role: true },
     });

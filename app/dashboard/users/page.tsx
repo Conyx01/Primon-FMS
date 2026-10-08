@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Copy, Plus, RefreshCw, Shield } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { MoreVertical, Plus, RefreshCw, Shield, Trash2, UserMinus, UserCheck } from "lucide-react";
 import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface AppUser {
   email: string;
   role: AppRole;
   createdAt: string;
+  deactivatedAt: string | null;
   _count?: { clientWorkOrders: number };
 }
 
@@ -30,13 +32,37 @@ const ROLE_LABEL: Record<AppRole, string> = {
 };
 
 export default function UsersPage() {
-  const { role } = useCurrentUser();
+  const { role, user: me } = useCurrentUser();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", role: "client" as AppRole });
   const [busy, setBusy] = useState(false);
   const [inviteBanner, setInviteBanner] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("[data-user-menu-trigger]")) return;
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuId(null);
+      }
+    }
+    function close() {
+      setMenuId(null);
+    }
+    if (menuId) {
+      document.addEventListener("mousedown", handleClick);
+      window.addEventListener("scroll", close, true);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menuId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +125,58 @@ export default function UsersPage() {
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to issue invite");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setDeactivated(id: string, deactivated: boolean) {
+    if (
+      !window.confirm(
+        deactivated
+          ? "Deactivate this account? They will not be able to sign in. History is kept."
+          : "Reactivate this account so they can sign in again?"
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deactivated }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update user");
+      setInviteBanner(deactivated ? "Account deactivated." : "Account reactivated.");
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update user");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeUser(id: string) {
+    if (
+      !window.confirm(
+        "Permanently delete this user? Only unused accounts (no work orders or readings) can be deleted."
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete user");
+      setInviteBanner("User deleted.");
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete user");
     } finally {
       setBusy(false);
     }
@@ -176,20 +254,21 @@ export default function UsersPage() {
           </p>
         </Card>
 
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           {loading ? (
             <p className="p-6 text-sm text-muted">Loading users…</p>
           ) : users.length === 0 ? (
             <EmptyState title="No users" description="Create the first invite above." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="w-full overflow-x-auto touch-pan-x">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted">
                     <th className="px-6 py-3">Name</th>
                     <th className="px-6 py-3">Email</th>
                     <th className="px-6 py-3">Role</th>
                     <th className="px-6 py-3">Added</th>
+                    <th className="px-6 py-3">Status</th>
                     <th className="px-6 py-3" />
                   </tr>
                 </thead>
@@ -205,18 +284,35 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td className="px-6 py-3 text-muted">{formatDate(u.createdAt)}</td>
-                      <td className="px-6 py-3 text-right">
-                        <Button
+                      <td className="px-6 py-3">
+                        {u.deactivatedAt ? (
+                          <span className="text-[11px] text-status-critical">Deactivated</span>
+                        ) : (
+                          <span className="text-[11px] text-status-compliant">Active</span>
+                        )}
+                      </td>
+                      <td className="sticky right-0 bg-white px-6 py-3 text-right">
+                        <button
                           type="button"
-                          size="sm"
-                          variant="secondary"
+                          data-user-menu-trigger
+                          aria-label={`Actions for ${u.name}`}
                           disabled={busy}
-                          onClick={() => reissue(u.id)}
+                          onClick={(e) => {
+                            if (menuId === u.id) {
+                              setMenuId(null);
+                              return;
+                            }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setMenuPos({
+                              top: rect.bottom + 4,
+                              right: window.innerWidth - rect.right,
+                            });
+                            setMenuId(u.id);
+                          }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-primon-700 hover:bg-primon-50 disabled:opacity-50"
                         >
-                          <RefreshCw className="h-3 w-3" />
-                          New invite
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -226,6 +322,64 @@ export default function UsersPage() {
           )}
         </Card>
       </div>
+      {menuId &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-50 w-44 overflow-hidden rounded-lg border border-border bg-white py-1 text-left shadow-elevated"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-primon-50"
+              onClick={() => {
+                const id = menuId;
+                setMenuId(null);
+                void reissue(id);
+              }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              New invite
+            </button>
+            {me?.id !== menuId && (
+              <>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-primon-50"
+                  onClick={() => {
+                    const row = users.find((x) => x.id === menuId);
+                    const id = menuId;
+                    setMenuId(null);
+                    if (row) void setDeactivated(id, !row.deactivatedAt);
+                  }}
+                >
+                  {users.find((x) => x.id === menuId)?.deactivatedAt ? (
+                    <UserCheck className="h-3.5 w-3.5" />
+                  ) : (
+                    <UserMinus className="h-3.5 w-3.5" />
+                  )}
+                  {users.find((x) => x.id === menuId)?.deactivatedAt
+                    ? "Reactivate"
+                    : "Deactivate"}
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-status-critical hover:bg-status-criticalTint"
+                  onClick={() => {
+                    const id = menuId;
+                    setMenuId(null);
+                    void removeUser(id);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

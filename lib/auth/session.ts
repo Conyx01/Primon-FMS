@@ -27,5 +27,10 @@ export async function getSessionUser(): Promise<{
     return null;
   }
 
+  if (dbUser.deactivatedAt) {
+    await prisma.session.deleteMany({ where: { userId: dbUser.id } });
+    return null;
+  }
+
   return { authUser: session.user, dbUser };
 }

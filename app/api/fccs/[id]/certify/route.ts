@@ -195,6 +195,7 @@ export async function POST(
             channel: NotificationChannel.in_app,
             payload: {
               fccId: fcc.id,
+              workOrderId: fcc.workOrderId,
               certificateNumber,
               verificationUrl: verifyUrl,
             },

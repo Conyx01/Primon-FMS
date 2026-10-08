@@ -4,7 +4,13 @@ import { NextResponse, type NextRequest } from "next/server";
 // /api/auth/get-session returns { session, user } — not just a Session record
 type GetSessionResponse = {
   session: { id: string; expiresAt: string; userId: string };
-  user: { id: string; email: string; name: string; role: string };
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    deactivatedAt?: string | Date | null;
+  };
 };
 
 const protectedRoutes = ["/dashboard", "/portal", "/certificate"];
@@ -28,6 +34,10 @@ export async function middleware(request: NextRequest) {
 
     if (!data?.user) {
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    if (data.user.deactivatedAt) {
+      return NextResponse.redirect(new URL("/login?deactivated=1", request.url));
     }
 
     const userRole = data.user.role;
