@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, NotificationChannel, ReadingStatus, Role, SignatureRole } from "@prisma/client";
 import { verificationUrl } from "@/lib/verify-url";
+import { emailFccCertified } from "@/lib/notify-email";
 
 const REQUIRED_ROLES: SignatureRole[] = [
   SignatureRole.supervising_fumigator,
@@ -204,6 +205,17 @@ export async function POST(
       }
     } catch (notifyError) {
       console.error("certify notification enqueue failed:", notifyError);
+    }
+
+    try {
+      await emailFccCertified({
+        certificateNumber,
+        verificationUrl: verifyUrl,
+        workOrderCode: fcc.workOrder.code,
+        clientId: fcc.workOrder.clientId,
+      });
+    } catch (emailError) {
+      console.error("certified FCC email failed:", emailError);
     }
 
     return NextResponse.json({ fcc: certified }, { status: 200 });

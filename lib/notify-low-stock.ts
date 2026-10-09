@@ -1,5 +1,6 @@
 import { NotificationChannel, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { emailLowStock } from "@/lib/notify-email";
 
 export async function notifyLowStockIfCrossed(args: {
   previousQty: number;
@@ -32,4 +33,14 @@ export async function notifyLowStockIfCrossed(args: {
       },
     })),
   });
+
+  try {
+    await emailLowStock({
+      formulationName: args.formulationName,
+      quantityOnHand: args.newQty,
+      threshold: args.threshold,
+    });
+  } catch (emailError) {
+    console.error("low stock email failed:", emailError);
+  }
 }

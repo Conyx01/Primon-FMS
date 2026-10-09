@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, NotificationChannel, ReadingStatus, Role } from "@prisma/client";
 import { deriveReadingStatus } from "@/lib/readings";
+import { emailCriticalReading } from "@/lib/notify-email";
 
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
@@ -24,7 +25,9 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.gasReading.findUnique({
       where: { id: readingId },
-      include: { fcc: true },
+      include: {
+        fcc: { include: { workOrder: { select: { id: true, code: true } } } },
+      },
     });
     if (!existing) {
       return NextResponse.json({ error: "Reading not found" }, { status: 404 });
@@ -116,10 +119,11 @@ export async function POST(req: NextRequest) {
 
       let fcc = existing.fcc;
       if (status === ReadingStatus.critical && fcc.status !== FccStatus.flagged) {
-        fcc = await tx.fCC.update({
+        await tx.fCC.update({
           where: { id: fcc.id },
           data: { status: FccStatus.flagged },
         });
+        fcc = { ...fcc, status: FccStatus.flagged };
 
         const recipients = await tx.user.findMany({
           where: { role: { in: [Role.ops_manager, Role.admin] } },
@@ -163,6 +167,23 @@ export async function POST(req: NextRequest) {
 
       return { reading, fcc };
     });
+
+    if (
+      status === ReadingStatus.critical &&
+      previousFccStatus !== FccStatus.flagged
+    ) {
+      try {
+        await emailCriticalReading({
+          workOrderId: existing.fcc.workOrderId,
+          workOrderCode: existing.fcc.workOrder.code,
+          dayNumber: result.reading.dayNumber,
+          airspacePpm: airspace,
+          probeCasePpm: probe,
+        });
+      } catch (emailError) {
+        console.error("critical reading email failed:", emailError);
+      }
+    }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: unknown) {

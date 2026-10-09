@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { NotificationChannel, PendingSubmissionSourceType, Role } from "@prisma/client";
+import { emailNewIntake } from "@/lib/notify-email";
 
 const VALID_SOURCE_TYPES: PendingSubmissionSourceType[] = [
   PendingSubmissionSourceType.work_order,
@@ -129,6 +130,16 @@ export async function POST(req: NextRequest) {
       }
     } catch (notifyError) {
       console.error("intake notification enqueue failed:", notifyError);
+    }
+
+    try {
+      await emailNewIntake({
+        submissionName: normalizedPayload.name,
+        sourceType: String(sourceType),
+        contact: normalizedPayload.contact,
+      });
+    } catch (emailError) {
+      console.error("intake email failed:", emailError);
     }
 
     return NextResponse.json({ submission }, { status: 201 });
