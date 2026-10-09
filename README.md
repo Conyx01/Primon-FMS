@@ -143,12 +143,11 @@ pnpm test:watch    # watch mode
 Tests cover: 600 ppm reading status boundary, rate limiter bucket logic, sequential
 FCC / WO number generation, and intake pre-fill field inference.
 
-## Pending (awaiting Primon credentials)
+## Out of v1 / deferred
 
 | Item | Blocker |
 |---|---|
-| Phase 9.2–9.7 — remaining in-app email types | Resend live for invites/reset; expand as needed |
-| Phase 10.2/10.4 — household reminder emails | Same |
-| `NEXT_PUBLIC_VERIFY_ORIGIN` | `verify.primon.mw` DNS delegation |
-| Executive dashboard | SDD open item — Ops decision needed |
-| Weekend/holiday skip for gas reading dates | SDD open item |
+| Phase 10.2/10.4 — household 6-month reminder emails | Parked (out of v1); cron hits a stub |
+| `NEXT_PUBLIC_VERIFY_ORIGIN` | Optional `verify.primon.mw` DNS |
+| Executive dashboard | SDD open item |
+| Public-holiday skip for reading dates | Sunday skip is live; no holiday UI |

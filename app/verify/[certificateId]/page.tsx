@@ -135,7 +135,7 @@ export default async function VerifyCertificatePage({
         )}
 
         <p className="mt-8 text-center text-[11px] text-muted">
-          <Link href="/" className="hover:text-primon-900">
+          <Link href="/login" className="hover:text-primon-900">
             Primon FMS
           </Link>
         </p>
