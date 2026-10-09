@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, NotificationChannel, ReadingStatus, Role } from "@prisma/client";
-import { deriveReadingStatus } from "@/lib/readings";
+import { deriveReadingStatus, day0BlocksGasReadings } from "@/lib/readings";
 import { emailCriticalReading } from "@/lib/notify-email";
 
 export async function POST(req: NextRequest) {
@@ -33,8 +33,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Reading not found" }, { status: 404 });
     }
 
+    const siblingReadings = await prisma.gasReading.findMany({
+      where: { fccId: existing.fccId },
+      select: {
+        dayNumber: true,
+        status: true,
+        ambientTempC: true,
+        productTempC: true,
+      },
+    });
+
     // ── Day 0: pre-fumigation temperature check only (no ppm required) ──────
     if (existing.dayNumber === 0) {
+      const laterLogged = siblingReadings.some(
+        (r) => r.dayNumber > 0 && r.status !== ReadingStatus.pending
+      );
+      if (laterLogged) {
+        return NextResponse.json(
+          {
+            error:
+              "Day 0 temperatures are locked after a Day 1–6 reading has been logged.",
+          },
+          { status: 409 }
+        );
+      }
+
       const ambTempNum =
         ambientTempC === "" || ambientTempC == null ? null : Number(ambientTempC);
       const prodTempNum =
@@ -81,6 +104,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Days 1-6: full gas reading with ppm ───────────────────────────────────
+    const day0 = siblingReadings.find((r) => r.dayNumber === 0) ?? null;
+    const day0Block = day0BlocksGasReadings(day0);
+    if (day0Block) {
+      return NextResponse.json({ error: day0Block }, { status: 409 });
+    }
+
     const airspace = Number(airspacePpm);
     const probe = Number(probeCasePpm);
     if (!Number.isFinite(airspace) || !Number.isFinite(probe)) {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CertificateView } from "@/components/certificate-view";
+import { ShippingInstructionsForm } from "@/components/shipping-instructions-form";
 import { DownloadCertificateButton } from "@/components/download-certificate-button";
 import { EmptyState } from "@/components/ui/kpi";
 import { Card } from "@/components/ui/card";
@@ -96,6 +97,12 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
           <PortalReadingStrip readings={wo.readings} />
         </div>
       </Card>
+
+      <ShippingInstructionsForm
+        workOrderId={wo.id}
+        initial={wo.si}
+        onSaved={(si) => setWo({ ...wo, si })}
+      />
 
       <CertificateView ref={sheetRef} workOrder={wo} />
       </div>

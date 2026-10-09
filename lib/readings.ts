@@ -1,4 +1,4 @@
-import { LETHAL_THRESHOLD } from "@/lib/status";
+import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
 import { ReadingStatus } from "@prisma/client";
 
 export function deriveReadingStatus(
@@ -9,6 +9,19 @@ export function deriveReadingStatus(
     return ReadingStatus.critical;
   }
   return ReadingStatus.compliant;
+}
+
+export function day0BlocksGasReadings(day0: {
+  ambientTempC: number | null;
+  productTempC: number | null;
+} | null): string | null {
+  if (!day0 || day0.ambientTempC == null || day0.productTempC == null) {
+    return "Record Day 0 pre-fumigation temperatures before logging gas readings.";
+  }
+  if (day0.productTempC < PRODUCT_TEMP_MINIMUM_C) {
+    return `Product temperature must be at least ${PRODUCT_TEMP_MINIMUM_C}°C before gas readings can be logged.`;
+  }
+  return null;
 }
 
 export function addCalendarDays(start: Date, days: number): Date {

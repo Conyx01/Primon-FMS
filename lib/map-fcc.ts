@@ -90,6 +90,7 @@ function emptySi(): ShippingInstructions {
     location: "",
     warehouseSection: "",
     complete: false,
+    locked: false,
   };
 }
 
@@ -113,6 +114,7 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
         location: siRow.location ?? "",
         warehouseSection: siRow.warehouseSection ?? "",
         complete: Boolean(siRow.tobaccoSupplier && siRow.consignee),
+        locked: Boolean(siRow.lockedAt) || fcc.status === "certified",
       }
     : emptySi();
 

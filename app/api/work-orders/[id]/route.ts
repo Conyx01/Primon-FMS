@@ -110,6 +110,19 @@ export async function PATCH(
       return NextResponse.json({ error: "Work Order not found" }, { status: 404 });
     }
 
+    if (clientId !== undefined) {
+      const nextClientId = clientId ? String(clientId) : null;
+      if (existing.clientId && existing.clientId !== nextClientId) {
+        return NextResponse.json(
+          {
+            error:
+              "A portal client is already attached to this work order and cannot be changed.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     if (clientId) {
       const client = await prisma.user.findUnique({
         where: { id: clientId },

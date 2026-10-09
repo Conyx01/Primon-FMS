@@ -431,36 +431,40 @@ function NewWorkOrderWizard() {
                   </Select>
                 </FormRow>
                 <p className="mt-3 text-[11px] text-muted">
-                  The selected account is who sees this work order in /portal. Invite a new
-                  client if they do not have a login yet.
+                  The selected account is who sees this work order in /portal.
+                  {clientId
+                    ? " Invite is hidden because a client is already selected."
+                    : " If they do not have a login yet, invite them below."}
                 </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <FormRow label="Invite name">
-                    <TextInput
-                      value={inviteName}
-                      onChange={(e) => setInviteName(e.target.value)}
-                      placeholder="Company or contact"
-                    />
-                  </FormRow>
-                  <FormRow label="Invite email">
-                    <TextInput
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="shipping@client.com"
-                    />
-                  </FormRow>
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={inviteClient}
-                      disabled={inviteBusy || !inviteName.trim() || !inviteEmail.trim()}
-                    >
-                      {inviteBusy ? "Inviting…" : "Invite & attach"}
-                    </Button>
+                {!clientId && (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <FormRow label="Invite name">
+                      <TextInput
+                        value={inviteName}
+                        onChange={(e) => setInviteName(e.target.value)}
+                        placeholder="Company or contact"
+                      />
+                    </FormRow>
+                    <FormRow label="Invite email">
+                      <TextInput
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="shipping@client.com"
+                      />
+                    </FormRow>
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={inviteClient}
+                        disabled={inviteBusy || !inviteName.trim() || !inviteEmail.trim()}
+                      >
+                        {inviteBusy ? "Inviting…" : "Invite & attach"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
                 {inviteUrl && (
                   <p className="mt-2 text-[11px] text-primon-800">
                     Client invited. Check that they received the email; the set-password link was

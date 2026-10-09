@@ -28,6 +28,7 @@ export interface ShippingInstructions {
   location: string;
   warehouseSection: string;
   complete: boolean;
+  locked?: boolean;
 }
 
 export interface FumigationDescription {

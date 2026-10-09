@@ -12,7 +12,7 @@ import { FccStatusPill } from "@/components/ui/status-pill";
 import { FormRow, Label, TextInput, Select } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/kpi";
 import { GasReading, FccStatus } from "@/lib/types";
-import { LETHAL_THRESHOLD } from "@/lib/status";
+import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
 
 type ApiReading = {
@@ -154,6 +154,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     if (!canAttachClient) return;
+    if (fcc?.workOrder.client?.id) return;
     let cancelled = false;
     (async () => {
       try {
@@ -167,7 +168,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     return () => {
       cancelled = true;
     };
-  }, [canAttachClient]);
+  }, [canAttachClient, fcc?.workOrder.client?.id]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -190,24 +191,28 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     fcc?.closeout?.aerationBegan && fcc?.closeout?.aerationCompleted
   );
   const canCertify = allResolved && closeoutComplete && fcc?.status !== "certified";
+  const attachedClient = fcc?.workOrder.client ?? null;
+  const day0Ready =
+    day0Reading != null &&
+    day0Reading.ambientTemp != null &&
+    day0Reading.productTemp != null &&
+    day0Reading.productTemp >= PRODUCT_TEMP_MINIMUM_C;
+  const canUpdateDay0 = mapped16.every((r) => r.status === "pending");
+  const canLogGasReading = day0Ready && nextPendingDay !== null;
 
   async function saveClientAttach() {
-    if (!fcc) return;
+    if (!fcc || !selectedClientId) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/work-orders/${fcc.workOrder.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId: selectedClientId || null }),
+        body: JSON.stringify({ clientId: selectedClientId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to attach client");
       await load();
-      showToast(
-        selectedClientId
-          ? "Client attached — they will see this job in the portal."
-          : "Client unassigned from this work order."
-      );
+      showToast("Client attached — they will see this job in the portal.");
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Failed to attach client");
     } finally {
@@ -254,9 +259,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       if (!res.ok) throw new Error(data.error || "Failed to save Day 0 check");
       await load();
       const prod = Number(day0Form.productTemp);
-      if (prod < 16) {
+      if (prod < PRODUCT_TEMP_MINIMUM_C) {
         showToast(
-          `Day 0 recorded — ⚠ Product temp ${prod}°C is below 16°C minimum. Ops to review before proceeding.`
+          `Day 0 recorded — product temp ${prod}°C is below ${PRODUCT_TEMP_MINIMUM_C}°C. Days 1–6 stay locked until it meets the minimum.`
         );
       } else {
         showToast("Day 0 pre-fumigation check recorded — product temp meets minimum.");
@@ -452,7 +457,15 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               </p>
             </div>
           </div>
-          {canAttachClient && (
+          {canAttachClient && attachedClient && (
+            <div className="mt-5 border-t border-border pt-5">
+              <p className="text-xs text-muted">Portal client</p>
+              <p className="mt-1 text-sm font-medium text-ink">
+                {attachedClient.name} — {attachedClient.email}
+              </p>
+            </div>
+          )}
+          {canAttachClient && !attachedClient && (
             <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-border pt-5">
               <div className="min-w-[220px] flex-1">
                 <FormRow label="Portal client">
@@ -460,7 +473,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                     value={selectedClientId}
                     onChange={(e) => setSelectedClientId(e.target.value)}
                   >
-                    <option value="">Not attached</option>
+                    <option value="">Select a client…</option>
                     {clientOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} — {c.email}
@@ -473,9 +486,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 size="sm"
                 variant="secondary"
                 onClick={saveClientAttach}
-                disabled={saving}
+                disabled={saving || !selectedClientId}
               >
-                Save client
+                Attach client
               </Button>
             </div>
           )}
@@ -519,11 +532,10 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           <Card className="mb-6">
             <CardHeader
               title="Day 0 — Pre-Fumigation Check"
-              description="Ambient and Product temperature recorded on the day fumigant is placed. Product temp must be ≥ 16°C to proceed."
+              description={`Ambient and product temperature on the day fumigant is placed. Product temp must be ≥ ${PRODUCT_TEMP_MINIMUM_C}°C before Days 1–6 can be logged.`}
             />
             <div className="px-6 pb-6">
-              {day0Reading.status === "pending" ? (
-                loggingDay0 ? (
+              {loggingDay0 ? (
                   <div className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2 max-w-sm">
                       <div>
@@ -548,9 +560,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                           value={day0Form.productTemp}
                           onChange={(e) => setDay0Form({ ...day0Form, productTemp: e.target.value })}
                         />
-                        {day0Form.productTemp && Number(day0Form.productTemp) < 16 && (
+                        {day0Form.productTemp && Number(day0Form.productTemp) < PRODUCT_TEMP_MINIMUM_C && (
                           <p className="mt-1 text-[11px] text-amber-600">
-                            ⚠ Below 16°C minimum — Ops review required before fumigating.
+                            Below {PRODUCT_TEMP_MINIMUM_C}°C — Days 1–6 stay locked until this meets the minimum.
                           </p>
                         )}
                       </div>
@@ -565,13 +577,19 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                       </Button>
                     </div>
                   </div>
-                ) : (
-                  <Button size="sm" variant="secondary" onClick={() => setLoggingDay0(true)}>
+              ) : day0Reading.status === "pending" ? (
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    setDay0Form({
+                      ambientTemp: day0Reading.ambientTemp != null ? String(day0Reading.ambientTemp) : "",
+                      productTemp: day0Reading.productTemp != null ? String(day0Reading.productTemp) : "",
+                    });
+                    setLoggingDay0(true);
+                  }}>
                     Record pre-fumigation temperatures
                   </Button>
-                )
               ) : (
-                <div className="flex items-center gap-8 text-sm">
+                <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-8 text-sm">
                   <div>
                     <p className="text-xs text-muted">Ambient Temp</p>
                     <p className="mt-0.5 font-medium text-ink">
@@ -582,16 +600,16 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                     <p className="text-xs text-muted">Product Temp</p>
                     <p
                       className={`mt-0.5 font-medium ${
-                        (day0Reading.productTemp ?? 0) < 16
+                        (day0Reading.productTemp ?? 0) < PRODUCT_TEMP_MINIMUM_C
                           ? "text-amber-600"
                           : "text-status-compliant"
                       }`}
                     >
                       {day0Reading.productTemp != null ? `${day0Reading.productTemp}°C` : "—"}
-                      {day0Reading.productTemp != null && day0Reading.productTemp >= 16 && (
-                        <span className="ml-1 text-[10px]">✓ ≥ 16°C</span>
+                      {day0Reading.productTemp != null && day0Reading.productTemp >= PRODUCT_TEMP_MINIMUM_C && (
+                        <span className="ml-1 text-[10px]">✓ ≥ {PRODUCT_TEMP_MINIMUM_C}°C</span>
                       )}
-                      {day0Reading.productTemp != null && day0Reading.productTemp < 16 && (
+                      {day0Reading.productTemp != null && day0Reading.productTemp < PRODUCT_TEMP_MINIMUM_C && (
                         <span className="ml-1 text-[10px]">⚠ below minimum</span>
                       )}
                     </p>
@@ -600,6 +618,22 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                     <p className="text-xs text-muted">Date</p>
                     <p className="mt-0.5 font-medium text-ink">{formatDate(day0Reading.date)}</p>
                   </div>
+                </div>
+                {canUpdateDay0 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setDay0Form({
+                        ambientTemp: day0Reading.ambientTemp != null ? String(day0Reading.ambientTemp) : "",
+                        productTemp: day0Reading.productTemp != null ? String(day0Reading.productTemp) : "",
+                      });
+                      setLoggingDay0(true);
+                    }}
+                  >
+                    Update temperatures
+                  </Button>
+                )}
                 </div>
               )}
             </div>
@@ -613,11 +647,19 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               title="6-day monitoring window"
               description="Airspace and Probe/Case readings, checked against the 600ppm lethal threshold."
             />
+            {!day0Ready && (
+              <p className="px-6 text-xs text-amber-700">
+                {day0Reading?.productTemp != null &&
+                day0Reading.productTemp < PRODUCT_TEMP_MINIMUM_C
+                  ? `Days 1–6 are locked until product temperature is at least ${PRODUCT_TEMP_MINIMUM_C}°C.`
+                  : "Record Day 0 pre-fumigation temperatures before logging Days 1–6."}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 lg:grid-cols-6">
               {mapped16.map((r) => (
                 <div key={r.day} className="space-y-2">
                   <GasDayGauge reading={r} />
-                  {r.status === "pending" && r.day === nextPendingDay && (
+                  {canLogGasReading && r.status === "pending" && r.day === nextPendingDay && (
                     <Button
                       size="sm"
                       variant="secondary"

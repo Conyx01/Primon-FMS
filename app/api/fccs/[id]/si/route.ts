@@ -45,8 +45,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden: Superivsors cannot edit SI" }, { status: 403 });
     }
 
-    // Check if SI locked
-    if (fcc.shippingInstructions?.lockedAt) {
+    if (fcc.shippingInstructions?.lockedAt || fcc.status === "certified") {
       return NextResponse.json(
         { error: "Shipping instructions are locked post-certification and cannot be modified" },
         { status: 409 }

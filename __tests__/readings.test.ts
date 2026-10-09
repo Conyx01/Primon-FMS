@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveReadingStatus } from "@/lib/readings";
+import { deriveReadingStatus, day0BlocksGasReadings } from "@/lib/readings";
 import { ReadingStatus } from "@prisma/client";
 
 describe("deriveReadingStatus — 600 ppm threshold (SDD §M.1)", () => {
@@ -32,5 +32,26 @@ describe("deriveReadingStatus — 600 ppm threshold (SDD §M.1)", () => {
     expect(deriveReadingStatus(599, 600)).toBe(ReadingStatus.critical);
     expect(deriveReadingStatus(600, 599)).toBe(ReadingStatus.critical);
     expect(deriveReadingStatus(600, 600)).toBe(ReadingStatus.compliant);
+  });
+});
+
+describe("day0BlocksGasReadings — 16°C product-temp gate", () => {
+  it("blocks when Day 0 has not been recorded", () => {
+    expect(day0BlocksGasReadings(null)).toMatch(/Day 0/i);
+    expect(
+      day0BlocksGasReadings({ ambientTempC: null, productTempC: null })
+    ).toMatch(/Day 0/i);
+  });
+
+  it("blocks when product temp is below 16°C", () => {
+    expect(
+      day0BlocksGasReadings({ ambientTempC: 22, productTempC: 15.9 })
+    ).toMatch(/16/);
+  });
+
+  it("allows gas readings at exactly 16°C", () => {
+    expect(
+      day0BlocksGasReadings({ ambientTempC: 20, productTempC: 16 })
+    ).toBeNull();
   });
 });

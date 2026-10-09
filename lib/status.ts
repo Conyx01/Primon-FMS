@@ -76,3 +76,6 @@ export const dayStatusMeta: Record<
 };
 
 export const LETHAL_THRESHOLD = 600;
+
+/** Product temperature must be at least this before Days 1–6 may be logged. */
+export const PRODUCT_TEMP_MINIMUM_C = 16;
