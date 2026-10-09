@@ -4,13 +4,16 @@ import { cn } from "@/lib/utils";
 export function PrimonLogo({
   className,
   width = 220,
+  variant = "color",
 }: {
   className?: string;
   width?: number;
+  /** `onDark` uses the white wordmark for navy backgrounds. */
+  variant?: "color" | "onDark";
 }) {
   return (
     <Image
-      src="/logo.png"
+      src={variant === "onDark" ? "/Primon-logo.png" : "/logo.png"}
       alt="Primon Enterprises Ltd — Setting Standard in Pest Management Services"
       width={width}
       height={Math.round((width * 242) / 858)}

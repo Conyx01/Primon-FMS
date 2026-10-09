@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { ShieldCheck, ShieldX } from "lucide-react";
 import { PrimonLogo } from "@/components/logo";
+import { GridPattern } from "@/components/ui/grid-pattern";
 import { loadCertifiedPublicSummary } from "@/lib/verify-fcc";
 import { verificationHostLabel } from "@/lib/verify-url";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -26,14 +27,22 @@ export default async function VerifyCertificatePage({
 
   return (
     <main className="min-h-screen bg-canvas">
-      <header className="border-b border-border bg-white px-6 py-5">
-        <div className="mx-auto flex max-w-lg items-center justify-between">
-          <PrimonLogo width={160} />
-          <p className="text-[11px] text-muted">Official verification</p>
+      <header className="bg-primon-950 px-6 py-6">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-4">
+          <PrimonLogo variant="onDark" width={220} />
+          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-primon-300">
+            Official verification
+          </p>
         </div>
       </header>
 
-      <div className="mx-auto max-w-lg px-6 py-10">
+      <div className="relative mx-auto max-w-lg px-6 py-10">
+        <GridPattern
+          width={40}
+          height={40}
+          className="fill-primon-200/30 stroke-primon-200/40 [mask-image:linear-gradient(to_bottom,white,transparent)]"
+        />
+        <div className="relative z-10">
         {!allowed ? (
           <div className="rounded-2xl border border-border bg-white p-8 shadow-card">
             <p className="font-display text-2xl text-primon-950">Too many requests</p>
@@ -130,6 +139,7 @@ export default async function VerifyCertificatePage({
             Primon FMS
           </Link>
         </p>
+        </div>
       </div>
     </main>
   );

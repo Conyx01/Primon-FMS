@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PrimonLogo } from "@/components/logo";
+import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Label, TextInput } from "@/components/ui/input";
 
@@ -67,50 +67,49 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-16">
-      <div className="w-full max-w-sm">
-        <PrimonLogo width={160} />
-        {status === "loading" && <p className="mt-8 text-sm text-muted">Checking invite…</p>}
-        {status === "invalid" && (
-          <div className="mt-8">
-            <h1 className="font-display text-2xl text-primon-950">Invite not valid</h1>
-            <p className="mt-2 text-sm text-muted">
-              This link has expired or already been used. Ask Primon to send a new invite.
-            </p>
+    <AuthShell>
+      {status === "loading" && <p className="text-sm text-muted">Checking invite…</p>}
+      {status === "invalid" && (
+        <div>
+          <h1 className="font-display text-2xl text-primon-950">Invite not valid</h1>
+          <p className="mt-2 text-sm text-muted">
+            This link has expired or already been used. Ask Primon to send a new invite.
+          </p>
+        </div>
+      )}
+      {status === "valid" && (
+        <form onSubmit={submit} className="space-y-4">
+          <p className="text-sm font-medium tracking-wide text-primon-600">
+            Set your password
+          </p>
+          <h1 className="font-display text-2xl text-primon-950">Welcome, {meta.name}</h1>
+          <p className="text-sm text-muted">{meta.email}</p>
+          {error && <p className="text-sm text-status-critical">{error}</p>}
+          <div>
+            <Label>Password</Label>
+            <TextInput
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
           </div>
-        )}
-        {status === "valid" && (
-          <form onSubmit={submit} className="mt-8 space-y-4">
-            <p className="text-sm text-brass-600">Set your password</p>
-            <h1 className="font-display text-2xl text-primon-950">Welcome, {meta.name}</h1>
-            <p className="text-sm text-muted">{meta.email}</p>
-            {error && <p className="text-sm text-status-critical">{error}</p>}
-            <div>
-              <Label>Password</Label>
-              <TextInput
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-            <div>
-              <Label>Confirm password</Label>
-              <TextInput
-                type="password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-            <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Saving…" : "Save password and continue"}
-            </Button>
-          </form>
-        )}
-      </div>
-    </main>
+          <div>
+            <Label>Confirm password</Label>
+            <TextInput
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+          </div>
+          <Button type="submit" disabled={busy} className="w-full" size="lg">
+            {busy ? "Saving…" : "Save password and continue"}
+          </Button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ShieldCheck, Wind, QrCode, ClipboardList } from "lucide-react";
 import { PrimonLogo, PrimonMark } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { GridPattern } from "@/components/ui/grid-pattern";
 
 export default function LandingPage() {
   return (
@@ -19,7 +20,13 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative mx-auto max-w-7xl overflow-hidden px-6 pb-24 pt-10 lg:px-10">
+      <section className="relative overflow-hidden">
+        <GridPattern
+          width={48}
+          height={48}
+          className="fill-primon-200/35 stroke-primon-200/45 [mask-image:radial-gradient(ellipse_at_center,white,transparent_75%)]"
+        />
+        <div className="relative mx-auto max-w-7xl px-6 pb-24 pt-10 lg:px-10">
         <div className="grid items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="animate-reveal-up [animation-delay:80ms] opacity-0">
             <p className="mb-5 text-sm text-brass-600">
@@ -62,7 +69,7 @@ export default function LandingPage() {
           {/* Certificate hero visual */}
           <div className="relative flex justify-center lg:justify-end">
             <div className="pointer-events-none absolute -inset-x-10 top-10 h-72 rounded-full bg-primon-100/70 blur-3xl" />
-            <div className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-border bg-white p-6 opacity-0 shadow-elevated [animation-delay:220ms] [transform:rotate(2deg)]">
+            <div className="relative w-full max-w-sm animate-scale-in overflow-hidden rounded-2xl border border-border bg-white p-6 opacity-0 shadow-elevated [animation-delay:220ms] [transform:rotate(2deg)] before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-primon-800">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <PrimonMark className="h-7 w-7 text-primon-800" />
                 <span className="rounded-full bg-status-compliantTint px-2.5 py-1 text-[10px] font-medium text-status-compliant">
@@ -105,6 +112,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </section>
 
@@ -205,7 +213,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-border bg-primon-950 py-10 text-primon-300">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-6 sm:flex-row sm:items-center lg:px-10">
-          <PrimonLogo width={150} />
+          <PrimonLogo variant="onDark" width={200} />
           <p className="text-xs">
             © 2026 Primon Enterprises Limited. Licensed commercial applicator, Malawi Pesticides Control Board.
           </p>

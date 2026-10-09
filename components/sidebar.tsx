@@ -76,12 +76,12 @@ export function Sidebar() {
           isMobileNavOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center px-5">
+        <div className="flex h-[4.5rem] items-center px-5">
           <Image
               src="/Primon-logo.png"
               alt="Primon Enterprises Ltd"
-              width={140}
-              height={Math.round((140 * 242) / 858)}
+              width={168}
+              height={Math.round((168 * 242) / 858)}
               className="object-contain"
               priority
             />

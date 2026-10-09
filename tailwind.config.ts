@@ -65,11 +65,15 @@ const config: Config = {
           "0%": { height: "0%" },
           "100%": { height: "var(--fill-to)" },
         },
+        "border-beam": {
+          "100%": { "offset-distance": "100%" },
+        },
       },
       animation: {
         "reveal-up": "reveal-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         "scale-in": "scale-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         "fill-bar": "fill-bar 1s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "border-beam": "border-beam calc(var(--duration)*1s) infinite linear",
       },
     },
   },
