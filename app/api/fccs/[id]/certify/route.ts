@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
-import { FccStatus, NotificationChannel, ReadingStatus, Role, SignatureRole } from "@prisma/client";
+import { FccStatus, NotificationChannel, Role, SignatureRole } from "@prisma/client";
 import { verificationUrl } from "@/lib/verify-url";
 import { emailFccCertified } from "@/lib/notify-email";
+import { canCertifyGasReadings, REQUIRED_SUCCESSFUL_GAS_DAYS } from "@/lib/successful-days";
 
 const REQUIRED_ROLES: SignatureRole[] = [
   SignatureRole.supervising_fumigator,
@@ -92,22 +93,11 @@ export async function POST(
     }
 
     const readings = fcc.gasReadings;
-    // Day 0 is a pre-fumigation check only; certification gates on Days 1-6
-    const readings16 = readings.filter((r) => r.dayNumber > 0);
-    const allResolved =
-      readings16.length === 6 &&
-      readings16.every(
-        (r) => r.status === ReadingStatus.compliant || r.status === ReadingStatus.action_taken
-      );
-    if (!allResolved) {
+    if (!canCertifyGasReadings(readings)) {
       return NextResponse.json(
-        { error: "All six days must be compliant or action_taken before certification" },
-        { status: 409 }
-      );
-    }
-    if (readings16.some((r) => r.status === ReadingStatus.critical)) {
-      return NextResponse.json(
-        { error: "Unresolved critical readings block certification" },
+        {
+          error: `Certification requires ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful (≥600ppm) gas-reading days with no open critical or pending days`,
+        },
         { status: 409 }
       );
     }

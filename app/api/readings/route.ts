@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, NotificationChannel, ReadingStatus, Role } from "@prisma/client";
 import { deriveReadingStatus, day0BlocksGasReadings } from "@/lib/readings";
+import { createExtensionSlotIfNeeded } from "@/lib/extend-monitoring";
 import { emailCriticalReading } from "@/lib/notify-email";
 
 export async function POST(req: NextRequest) {
@@ -194,7 +195,12 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return { reading, fcc };
+      const extendedReading = await createExtensionSlotIfNeeded(tx, {
+        fccId: existing.fccId,
+        actorId: session.dbUser.id,
+      });
+
+      return { reading, fcc, extendedReading };
     });
 
     if (

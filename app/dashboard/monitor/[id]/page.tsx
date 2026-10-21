@@ -14,6 +14,11 @@ import { EmptyState } from "@/components/ui/kpi";
 import { GasReading, FccStatus } from "@/lib/types";
 import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
+import {
+  REQUIRED_SUCCESSFUL_GAS_DAYS,
+  canCertifyGasReadings,
+  successfulGasDayCount,
+} from "@/lib/successful-days";
 
 type ApiReading = {
   id: string;
@@ -183,9 +188,12 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const day0Reading = mapped.find((r) => r.day === 0) ?? null;
   const mapped16 = mapped.filter((r) => r.day > 0);
   const nextPendingDay = mapped16.find((r) => r.status === "pending")?.day ?? null;
-  const allResolved =
-    mapped16.length === 6 &&
-    mapped16.every((r) => r.status === "compliant" || r.status === "action_taken");
+  const successfulCount = successfulGasDayCount(
+    mapped16.map((r) => ({ dayNumber: r.day, status: r.status }))
+  );
+  const allResolved = canCertifyGasReadings(
+    mapped16.map((r) => ({ dayNumber: r.day, status: r.status }))
+  );
   const hasOpenCritical = mapped16.some((r) => r.status === "critical");
   const closeoutComplete = Boolean(
     fcc?.closeout?.aerationBegan && fcc?.closeout?.aerationCompleted
@@ -295,8 +303,12 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save reading");
       await load();
-      if (data.reading.status === "critical") {
-        showToast(`Day ${day} flagged critical — Ops Manager/Admin notified in-app.`);
+      if (data.extendedReading) {
+        showToast(
+          `Day ${day} saved. Extra monitoring day ${data.extendedReading.dayNumber} added — ${successfulCount + (data.reading.status === "compliant" ? 1 : 0)} of ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful days so far.`
+        );
+      } else if (data.reading.status === "critical") {
+        showToast(`Day ${day} flagged critical — log a re-dose, then continue. That day does not count toward the six successful days.`);
       } else {
         showToast(`Day ${day} reading saved — compliant.`);
       }
@@ -322,7 +334,11 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to log action");
       await load();
-      showToast(`Corrective action logged for Day ${day}.`);
+      showToast(
+        data.extendedReading
+          ? `Re-dose logged for Day ${day}. Extra monitoring day ${data.extendedReading.dayNumber} added.`
+          : `Re-dose logged for Day ${day}. That day does not count toward the six successful days.`
+      );
       setActionDay(null);
       setActionNote("");
     } catch (err: unknown) {
@@ -499,8 +515,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             <p className="mb-1 font-display text-lg text-primon-950">Date fumigant placed</p>
             <p className="mb-4 text-xs text-muted">
               Recording this date opens a 6-day monitoring window (Sundays skipped automatically;
-              public holidays are adjusted manually by Ops). Day 0 pre-fumigation check is created
-              on the placed date itself.
+              public holidays are adjusted manually by Ops). If a day stays below 600ppm after
+              re-dose, another log day is added automatically once the original slots are used.
+              Day 0 pre-fumigation check is created on the placed date itself.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <FormRow label="Date & time placed" required>
@@ -640,12 +657,12 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           </Card>
         )}
 
-        {/* Days 1-6 gauges */}
+        {/* Gas-day gauges (starts at 6; extra days appear after a failed window) */}
         {mapped16.length > 0 && (
           <Card>
             <CardHeader
-              title="6-day monitoring window"
-              description="Airspace and Probe/Case readings, checked against the 600ppm lethal threshold."
+              title="Gas-reading monitor"
+              description={`${successfulCount} of ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful days (≥${LETHAL_THRESHOLD}ppm both probes). Failed days stay on this log; the certificate shows successful days only.`}
             />
             {!day0Ready && (
               <p className="px-6 text-xs text-amber-700">
@@ -655,7 +672,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                   : "Record Day 0 pre-fumigation temperatures before logging Days 1–6."}
               </p>
             )}
-            <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 lg:grid-cols-7">
               {mapped16.map((r) => (
                 <div key={r.day} className="space-y-2">
                   <GasDayGauge reading={r} />
@@ -746,12 +763,14 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               Corrective action — Day {actionDay}
             </p>
             <p className="mb-4 text-xs text-muted">
-              Describe the action taken to restore gas concentration above {LETHAL_THRESHOLD}ppm.
+              Log the re-dose (and any leak repair). This day does not count toward the six
+              successful fumigation days. A leak that never dropped below {LETHAL_THRESHOLD}ppm
+              is just a passing reading — do not use this form.
             </p>
             <Label>Action taken</Label>
             <textarea
               className="h-24 w-full rounded-lg border border-border p-3 text-sm outline-none focus:border-primon-500"
-              placeholder="e.g. Additional fumigant dosing applied; re-sealed and re-checked."
+              placeholder="e.g. Additional fumigant dosing applied; sheets re-sealed and re-checked."
               value={actionNote}
               onChange={(e) => setActionNote(e.target.value)}
             />
@@ -856,8 +875,8 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 {fcc.status === "certified"
                   ? "This FCC is locked. Scan the QR on the certificate to open the public summary."
                   : canCertify
-                    ? "All 6 gas-reading days resolved and close-out recorded. Enter the three signers, then certify."
-                    : "Complete all 6 daily gas readings (Days 1-6), resolve critical flags, and record aeration close-out before certifying."}
+                    ? `${REQUIRED_SUCCESSFUL_GAS_DAYS} successful gas-reading days and close-out recorded. Enter the three signers, then certify.`
+                    : `Record ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful (≥${LETHAL_THRESHOLD}ppm) days, resolve any critical flags, and save aeration close-out before certifying.`}
               </p>
             </div>
           </div>

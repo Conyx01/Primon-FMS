@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import type { WorkOrder, GasReading } from "@/lib/types";
+import { certificateSuccessfulReadings } from "@/lib/successful-days";
 
 const PRINCE_CHIWALO = /prince\s+chiwalo/i;
 
@@ -91,8 +92,13 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
   const si = wo.si;
   const fum = wo.fumigation;
 
-  // Build reading lookup by dayNumber
-  const byDay = new Map<number, GasReading>(wo.readings.map((r) => [r.day, r]));
+  // Certificate table: Day 0 plus six successful (≥600ppm) days in date order.
+  const byDay = new Map<number, GasReading>();
+  const day0 = wo.readings.find((r) => r.day === 0);
+  if (day0) byDay.set(0, day0);
+  certificateSuccessfulReadings(wo.readings).forEach((r, i) => {
+    byDay.set(i + 1, r);
+  });
 
   // Formulation flags
   const formLower = (fum.formulation ?? "").toLowerCase();

@@ -2,7 +2,7 @@
 
 This file combines the planned development roadmap and the reactive work log (fixes and debug sessions). It is managed by `@tasklist` (Planned Roadmap section only) and `@intake` (Reactive Log section only — `@tasklist` never writes here). It does not carry its own version number; git history and the `[x]` markers are sufficient. The SDD (`/Docs/Primon_FMS_System_Design_Document.md`) is versioned and is the contract this roadmap implements.
 
-**v1 ship status (2026-10-09):** The industrial FCC product is complete for production use: Neon/Prisma, Better Auth + RBAC, work orders, stock, SI + description + deduction, Day 0 (≥16°C) + 6-day monitor (Sunday skip), close-out, certify (`FCC-PE-YYYY-######`), QR/PDF, public verify, website intake, Users/invites, operational Resend email (critical / certified / intake / low stock), client portal SI edit. **Parked:** household 6-month reminder send (10.2 / 10.4). **Deferred / ops:** Vercel Blob PDFs, `verify.primon.mw`, Executive dashboard, public-holiday date editor, Sentry.
+**v1 ship status (2026-10-21):** The industrial FCC product is complete for production use: Neon/Prisma, Better Auth + RBAC, work orders, stock, SI + description + deduction, Day 0 (≥16°C) + monitor until **six successful (≥600ppm) days** (Sunday skip; extra slot auto-appended after a re-dose window), close-out, certify (`FCC-PE-YYYY-######`; certificate shows successful days only), QR/PDF, public verify, website intake, Users/invites, operational Resend email (critical / certified / intake / low stock), client portal SI edit. **Parked:** household 6-month reminder send (10.2 / 10.4). **Deferred / ops:** Vercel Blob PDFs, `verify.primon.mw`, Executive dashboard, public-holiday date editor, Sentry.
 
 ---
 
@@ -58,17 +58,17 @@ This file combines the planned development roadmap and the reactive work log (fi
 - [x] 5.8 Write `audit_log` diffs for SI and fumigation-description writes.
 
 ### 6.0 Gas-Reading Monitor, Flagging & Close-Out (generated against SDD v1.0)
-- [x] 6.1 Date Fumigant Placed inserts Day 0 plus days 1–6. **Sundays skipped** (confirmed vs Primon paper FCC). Public holidays are not skipped in code (no holiday UI). Days 1–6 blocked until Day 0 temps are saved and product temp ≥ 16°C. Day 0 may be updated while days 1–6 are still pending.
+- [x] 6.1 Date Fumigant Placed inserts Day 0 plus days 1–6. **Sundays skipped** (confirmed vs Primon paper FCC). Public holidays are not skipped in code (no holiday UI). Days 1–6 blocked until Day 0 temps are saved and product temp ≥ 16°C. Day 0 may be updated while days 1–6 are still pending. After the last pending slot is logged, if fewer than six days are `compliant`, Day 7+ is appended automatically (Sunday skip). Re-dose (`action_taken`) does not count as a successful day.
 - [x] 6.2 `POST /api/readings`: numeric Airspace and Probe/Case; temps and RH optional. Store `status` (`compliant` if both ≥ 600ppm, `critical` if either < 600). Persist `enteredBy` / `enteredAt` from the session.
 - [x] 6.3 Critical: set FCC `flagged`, enqueue Ops/Admin in-app + email (9.3). Keep the day red until a corrective action is logged.
-- [x] 6.4 `POST /api/readings/[id]/corrective-action`: session actor. Set day to `action_taken`. When no days remain `critical`, FCC to `under_review` or `in_progress`.
+- [x] 6.4 `POST /api/readings/[id]/corrective-action`: session actor. Set day to `action_taken` (re-dose). That day does not count toward the six successful days. FCC to `under_review` only when six `compliant` days exist and none are pending/critical.
 - [x] 6.5 Close-out form for Aeration Began, Aeration Completed, Duration / Total Hours Under Gas. Not auto-stamped in `certify()`. Save close-out stays visible so aeration can be corrected.
 - [x] 6.6 Wire `/dashboard/monitor` and `/dashboard/monitor/[id]` to the APIs. Sequential next-pending-day UX.
-- [x] 6.7 Block certification until all six days are `compliant` or `action_taken` **and** close-out is recorded. `audit_log` for readings and corrective actions.
+- [x] 6.7 Block certification until **six `compliant` days** exist, no open critical/pending gas days, **and** close-out is recorded. `action_taken` is documented on the monitor only. `audit_log` for readings and corrective actions.
 
 ### 7.0 Certification, Signatures, QR, PDF & Public Verify (generated against SDD v1.0)
 - [x] 7.1 Certification UI for Supervising Fumigator, For the Supplier, Certifying Officer. Persist `signatures`. System timestamp stands in for wet signature.
-- [x] 7.2 `POST /api/fccs/[id]/certify` in one transaction: three signers, six resolved days, close-out; `certified`; lock SI; sequential `FCC-PE-YYYY-######`.
+- [x] 7.2 `POST /api/fccs/[id]/certify` in one transaction: three signers, six successful (`compliant`) gas days, close-out; `certified`; lock SI; sequential `FCC-PE-YYYY-######`. Certificate table shows Day 0 + those six successful days (failed/re-dose days omitted).
 - [x] 7.3 QR payload is `{NEXT_PUBLIC_APP_URL}/verify/{FCC-PE-…}` until `NEXT_PUBLIC_VERIFY_ORIGIN` is set.
 - [x] 7.4 Certified FCC PDF client-side (html2canvas/jsPDF) only when `status = certified`. Blob PDF deferred.
 - [x] 7.5 Public `GET /api/verify/[certificateId]` (rate-limited). Pages `/verify/[certificateId]` and `/fcc/[certificateId]`.
@@ -102,7 +102,7 @@ This file combines the planned development roadmap and the reactive work log (fi
 ### 11.0 Observability, CI/CD, Tests & Production Config (generated against SDD v1.0)
 - [x] 11.1 `audit_log` for readings, corrective actions, stock, SI, certification, intake conversion.
 - [x] 11.2 GitHub Actions: typecheck, lint, `prisma validate`, tests.
-- [x] 11.3 Vitest unit tests (600ppm, rate-limit, FCC/WO number format, intake prefill, Day 0 16°C gate). Not full integration coverage of stock/certify/RBAC as originally worded.
+- [x] 11.3 Vitest unit tests (600ppm, rate-limit, FCC/WO number format, intake prefill, Day 0 16°C gate, six successful days + extra-slot spec). Not full integration coverage of stock/certify/RBAC as originally worded.
 - [x] 11.4 README rewritten for Next/Prisma/Neon/Better Auth (not Neon Auth).
 - [x] 11.5 Vercel env vars documented. No `INTAKE_API_KEY`. Secrets not committed.
 - [x] 11.6 Rate-limit intake and verify.
@@ -118,3 +118,4 @@ This file combines the planned development roadmap and the reactive work log (fi
 2026-09-24 — Phase 4.0 stock + Phase 5.0 FCC SI/description complete.
 2026-09-25 — Neon adapter fix; Phase 6.0 monitor; Phase 7.0 certify/verify; Phase 8.0 intake (later: no intake API key); 9.1 / 10.1 / 10.3 / 11.0 without Resend operational mail.
 2026-10-09 — Operational Resend: critical, certified, intake, low-stock (post-commit; invite/reset already live). Day 0 ≥ 16°C gate; portal SI editor; client attach locked after first save; wizard invite hidden when client selected. Auth visual: white `Primon-logo.png` on navy, particles, grid, blue border-beam card. Marketing landing purged; `/` → `/login`. Sunday skip confirmed vs paper FCC (not a bug). Household reminder send still parked (10.2 / 10.4). v1 industrial FCC considered complete for ship.
+2026-10-21 — Six successful fumigation days: `action_taken` (re-dose) no longer counts toward certification. Extra gas-reading slot auto-appended only when no pending Day 1+ remains and compliant count is below 6 (Sunday skip). Certificate PDF/preview shows Day 0 + six compliant columns; Ops monitor keeps every day.

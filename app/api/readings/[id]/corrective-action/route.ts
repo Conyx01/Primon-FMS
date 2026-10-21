@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, ReadingStatus } from "@prisma/client";
+import { canCertifyGasReadings, hasOpenCriticalGasDay } from "@/lib/successful-days";
+import { createExtensionSlotIfNeeded } from "@/lib/extend-monitoring";
 
 export async function POST(
   req: NextRequest,
@@ -64,19 +66,15 @@ export async function POST(
       });
 
       const siblings = await tx.gasReading.findMany({ where: { fccId: reading.fccId } });
-      const stillCritical = siblings.some(
-        (r) => r.id !== reading.id && r.status === ReadingStatus.critical
+      const resolvedSiblings = siblings.map((r) =>
+        r.id === reading.id ? { ...r, status: ReadingStatus.action_taken } : r
       );
-      const allResolved = siblings.every((r) =>
-        r.id === reading.id
-          ? true
-          : r.status === ReadingStatus.compliant || r.status === ReadingStatus.action_taken
-      );
+      const stillCritical = hasOpenCriticalGasDay(resolvedSiblings);
 
       let nextStatus = reading.fcc.status;
       if (stillCritical) {
         nextStatus = FccStatus.flagged;
-      } else if (allResolved) {
+      } else if (canCertifyGasReadings(resolvedSiblings)) {
         nextStatus = FccStatus.under_review;
       } else {
         nextStatus = FccStatus.in_progress;
@@ -103,7 +101,12 @@ export async function POST(
         },
       });
 
-      return { correctiveAction: action, fcc };
+      const extendedReading = await createExtensionSlotIfNeeded(tx, {
+        fccId: reading.fccId,
+        actorId: session.dbUser.id,
+      });
+
+      return { correctiveAction: action, fcc, extendedReading };
     });
 
     return NextResponse.json(result, { status: 200 });

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const STATUS_COPY: Record<FccStatus, string> = {
   draft: "Primon is still setting up this job. Shipping details may be incomplete.",
   in_progress:
-    "Monitoring is underway. Primon logs gas readings over six days (Sundays are skipped).",
+    "Monitoring is underway. Primon logs gas readings until six successful days are recorded (Sundays are skipped).",
   under_review: "Primon is reviewing this job before certification.",
   flagged: "A reading needs attention. Primon is handling the corrective action.",
   certified: "Fumigation is complete. You can download the certified certificate.",

@@ -1,5 +1,21 @@
 import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
 import { ReadingStatus } from "@prisma/client";
+import {
+  hasPendingGasDay,
+  successfulGasDayCount,
+  REQUIRED_SUCCESSFUL_GAS_DAYS,
+  type GasDayFields,
+} from "@/lib/successful-days";
+
+export {
+  REQUIRED_SUCCESSFUL_GAS_DAYS,
+  successfulGasDayCount,
+  hasPendingGasDay,
+  hasOpenCriticalGasDay,
+  canCertifyGasReadings,
+  certificateSuccessfulReadings,
+} from "@/lib/successful-days";
+export type { GasDayFields } from "@/lib/successful-days";
 
 export function deriveReadingStatus(
   airspacePpm: number,
@@ -46,4 +62,23 @@ export function buildReadingDates(start: Date, count: number): Date[] {
     }
   }
   return dates;
+}
+
+/**
+ * When no pending gas slot remains and fewer than six days are compliant,
+ * append one more working-day slot (Sunday skipped).
+ */
+export function extensionSlotSpec(
+  readings: GasDayFields[]
+): { dayNumber: number; readingDate: Date } | null {
+  if (hasPendingGasDay(readings)) return null;
+  if (successfulGasDayCount(readings) >= REQUIRED_SUCCESSFUL_GAS_DAYS) return null;
+  const gas = readings.filter((r) => r.dayNumber > 0 && r.readingDate != null);
+  if (gas.length === 0) return null;
+  const lastDate = gas.reduce((latest, r) => {
+    const d = new Date(r.readingDate as Date | string);
+    return d.getTime() > latest.getTime() ? d : latest;
+  }, new Date(gas[0].readingDate as Date | string));
+  const nextNum = Math.max(...gas.map((r) => r.dayNumber)) + 1;
+  return { dayNumber: nextNum, readingDate: buildReadingDates(lastDate, 1)[0] };
 }
