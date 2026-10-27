@@ -173,6 +173,7 @@ export default function DashboardPage() {
                       <option value="all">All Crops</option>
                       <option value="tobacco">Tobacco</option>
                       <option value="grain">Grain</option>
+                      <option value="other">Other / Specified</option>
                     </Select>
                     <Select
                       className="text-xs py-1.5 h-9 w-28"
@@ -195,7 +196,7 @@ export default function DashboardPage() {
                     <tr className="border-b border-border text-xs text-muted">
                       <th className="px-4 sm:px-6 py-3 font-medium">Work order</th>
                       <th className="px-3 py-3 font-medium">Client</th>
-                      <th className="px-3 py-3 font-medium">Crop</th>
+                      <th className="px-3 py-3 font-medium">Crop / Product</th>
                       <th className="px-3 py-3 font-medium">Created</th>
                       <th className="px-3 py-3 font-medium">Status</th>
                       <th className="px-4 sm:px-6 py-3" />
@@ -216,7 +217,9 @@ export default function DashboardPage() {
                           <tr key={w.id} className="border-b border-border last:border-0 hover:bg-primon-50/50">
                             <td className="px-4 sm:px-6 py-3.5 font-medium text-primon-900">{w.code}</td>
                             <td className="px-3 py-3.5 text-ink">{clientName}</td>
-                            <td className="px-3 py-3.5 capitalize text-ink">{w.cropType}</td>
+                            <td className="px-3 py-3.5 capitalize text-ink">
+                              {w.cropType === "other" ? (w.customProduct || "Other") : w.cropType}
+                            </td>
                             <td className="px-3 py-3.5 text-muted">{formatDate(w.createdAt)}</td>
                             <td className="px-3 py-3.5">
                               <FccStatusPill status={status} />

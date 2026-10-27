@@ -10,6 +10,6 @@ export function availableFormulations(
   return stock.filter(
     (s) =>
       s.fumigant === fumigant &&
-      (s.cropType === cropType || s.cropType === "both")
+      (s.cropType === cropType || s.cropType === "both" || cropType === "other")
   );
 }

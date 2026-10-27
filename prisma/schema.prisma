@@ -25,6 +25,7 @@ enum WorkOrderSource {
 enum CropType {
   tobacco
   grain
+  other
   both
 }
 
@@ -160,18 +161,19 @@ model Verification {
 }
 
 model WorkOrder {
-  id           String          @id @default(uuid())
-  code         String          @unique
-  source       WorkOrderSource @default(auto_generated)
-  cropType     CropType        @default(tobacco)
-  scale        Scale           @default(industrial)
-  status       String          @default("draft")
-  clientId     String?
-  salesOrderNo String?
-  shipmentNo   String?
-  deliveryNo   String?
-  createdById  String
-  createdAt    DateTime        @default(now())
+  id            String          @id @default(uuid())
+  code          String          @unique
+  source        WorkOrderSource @default(auto_generated)
+  cropType      CropType        @default(tobacco)
+  customProduct String?
+  scale         Scale           @default(industrial)
+  status        String          @default("draft")
+  clientId      String?
+  salesOrderNo  String?
+  shipmentNo    String?
+  deliveryNo    String?
+  createdById   String
+  createdAt     DateTime        @default(now())
 
   // Relations
   client         User?           @relation("ClientWorkOrders", fields: [clientId], references: [id])
@@ -207,24 +209,26 @@ model FCC {
 }
 
 model ShippingInstructions {
-  id                   String    @id @default(uuid())
-  fccId                String    @unique
-  tobaccoSupplier      String?
+  id                     String    @id @default(uuid())
+  fccId                  String    @unique
+  tobaccoSupplier        String?
   tobaccoSupplierAddress String?
-  consignee            String?
-  consigneeAddress     String?
-  fumigationContractor String?   @default("Primon Enterprises Limited")
-  cropYear             String?
-  tobaccoType          String?
-  netWeight            Float?
-  quantity             Int?
-  polylined            Boolean?
-  gradeName            String?
-  caseNos              String?
-  countryOfOrigin      String?
-  location             String?
-  warehouseSection     String?
-  lockedAt             DateTime?
+  consignee              String?
+  consigneeAddress       String?
+  fumigationContractor   String?   @default("Primon Enterprises Limited")
+  cropYear               String?
+  tobaccoType            String?
+  productType            String?
+  netWeight              Float?
+  grossWeight            Float?
+  quantity               Int?
+  polylined              Boolean?
+  gradeName              String?
+  caseNos                String?
+  countryOfOrigin        String?
+  location               String?
+  warehouseSection       String?
+  lockedAt               DateTime?
 
   // Relations
   fcc FCC @relation(fields: [fccId], references: [id], onDelete: Cascade)

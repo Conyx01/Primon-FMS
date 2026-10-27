@@ -72,7 +72,7 @@ export default function PortalHomePage() {
                       <div>
                         <p className="font-display text-lg text-primon-950">{w.code}</p>
                         <p className="text-xs capitalize text-muted">
-                          {w.cropType}
+                          {w.cropType === "other" ? (w.customProduct || "Other") : w.cropType}
                           {fcc?.certificateNumber ? ` · ${fcc.certificateNumber}` : ""}
                         </p>
                       </div>

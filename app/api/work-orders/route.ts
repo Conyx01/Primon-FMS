@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
   if (q) {
     where.OR = [
       { code: { contains: q, mode: "insensitive" } },
+      { customProduct: { contains: q, mode: "insensitive" } },
       { salesOrderNo: { contains: q, mode: "insensitive" } },
       { shipmentNo: { contains: q, mode: "insensitive" } },
       { deliveryNo: { contains: q, mode: "insensitive" } },
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
       code: customCode,
       source: customSource,
       cropType = "tobacco",
+      customProduct,
       scale = "industrial",
       clientId,
       salesOrderNo,
@@ -143,6 +145,7 @@ export async function POST(req: NextRequest) {
         code: finalCode,
         source,
         cropType: cropType as CropType,
+        customProduct: customProduct?.trim() || null,
         scale: scale as Scale,
         status: "draft",
         clientId: clientId || null,
@@ -153,6 +156,16 @@ export async function POST(req: NextRequest) {
         fcc: {
           create: {
             status: "draft",
+            ...(customProduct?.trim()
+              ? {
+                  shippingInstructions: {
+                    create: {
+                      tobaccoType: customProduct.trim(),
+                      productType: customProduct.trim(),
+                    },
+                  },
+                }
+              : {}),
           },
         },
       },

@@ -1,4 +1,4 @@
-export type CropType = "tobacco" | "grain";
+export type CropType = "tobacco" | "grain" | "other";
 export type FumigationType = "container" | "sheeted_stack";
 export type FumigantName = "Aluminium Phosphide" | "Magnesium Phosphide";
 
@@ -19,7 +19,9 @@ export interface ShippingInstructions {
   fumigationContractor?: string;
   cropYear: string;
   tobaccoType: string;
+  productType?: string;
   netWeight: string;
+  grossWeight: string;
   quantity: string;
   polylined: "Yes" | "No";
   gradeName: string;
@@ -63,6 +65,7 @@ export interface WorkOrder {
   codeSource: "client_supplied" | "auto_generated" | "website";
   client: string;
   cropType: CropType;
+  customProduct?: string;
   scale: "industrial" | "smallholder";
   status: FccStatus;
   createdAt: string;

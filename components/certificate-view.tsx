@@ -149,7 +149,12 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               Fumigation Conformance Certificate
             </h1>
             <p className="text-[8px] font-medium text-gray-500 uppercase tracking-wide">
-              {wo.cropType === "tobacco" ? "Tobacco" : titleCase(wo.cropType)} Fumigation
+              {wo.cropType === "tobacco"
+                ? "Tobacco"
+                : wo.cropType === "grain"
+                  ? "Grain"
+                  : (wo.customProduct || "Commodity")}{" "}
+              Fumigation
             </p>
             {wo.certificateNumber && (
               <p className="mt-1 rounded bg-primon-800 px-2 py-0.5 text-[9px] font-bold text-white tracking-widest">
@@ -186,7 +191,13 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
         <table className="w-full border-collapse text-[9px]">
           <tbody>
             <PartyRow
-              label="TOBACCO SUPPLIER"
+              label={
+                wo.cropType === "tobacco"
+                  ? "TOBACCO SUPPLIER"
+                  : wo.cropType === "grain"
+                    ? "GRAIN SUPPLIER"
+                    : `${(wo.customProduct || "PRODUCT").toUpperCase()} SUPPLIER`
+              }
               name={si.tobaccoSupplier || "—"}
               address={si.supplierAddress || "—"}
             />
@@ -204,19 +215,36 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
         </table>
       </section>
 
-      {/* ── SECTION 2: TOBACCO DESCRIPTION ── */}
+      {/* ── SECTION 2: PRODUCT DESCRIPTION ── */}
       <section className="px-8 pt-2 pb-2">
-        <SectionTitle>2. Tobacco Description</SectionTitle>
+        <SectionTitle>
+          2.{" "}
+          {wo.cropType === "tobacco"
+            ? "Tobacco Description"
+            : wo.cropType === "grain"
+              ? "Grain Description"
+              : `${titleCase(wo.customProduct || "Product")} Description`}
+        </SectionTitle>
         <div className="grid grid-cols-4 gap-x-4 gap-y-1 border border-gray-300 p-2 text-[9px]">
-          <Field label="Tobacco Type" value={si.tobaccoType || "—"} />
+          <Field
+            label={
+              wo.cropType === "tobacco"
+                ? "Tobacco Type"
+                : wo.cropType === "grain"
+                  ? "Grain Type"
+                  : "Product Type"
+            }
+            value={si.productType || si.tobaccoType || wo.customProduct || "—"}
+          />
           <Field label="Grade Name" value={si.gradeName || "—"} />
           <Field label="Crop Year" value={si.cropYear || "—"} />
           <Field label="Country of Origin" value={si.countryOfOrigin || "—"} />
           <Field label="Net Weight (kg)" value={si.netWeight || "—"} />
+          <Field label="Gross Weight (kg)" value={si.grossWeight || "—"} />
           <Field label="Quantity (bales/cases)" value={si.quantity || "—"} />
           <Field label="Polylined" value={si.polylined || "—"} />
           <Field label="Case Nos." value={si.caseNos || "—"} />
-          <Field label="Location" value={si.location || "—"} className="col-span-2" />
+          <Field label="Location" value={si.location || "—"} />
           <Field label="Warehouse Section" value={si.warehouseSection || "—"} className="col-span-2" />
         </div>
       </section>

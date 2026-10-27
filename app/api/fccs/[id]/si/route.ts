@@ -62,7 +62,9 @@ export async function PATCH(
       fumigationContractor = "Primon Enterprises Limited",
       cropYear,
       tobaccoType,
+      productType,
       netWeight,
+      grossWeight,
       quantity,
       polylined,
       gradeName,
@@ -77,6 +79,11 @@ export async function PATCH(
         ? netWeight
         : parseFloat(String(netWeight).replace(/[^0-9.]/g, "")) || null;
 
+    const parsedGrossWeight =
+      typeof grossWeight === "number"
+        ? grossWeight
+        : parseFloat(String(grossWeight).replace(/[^0-9.]/g, "")) || null;
+
     const parsedQuantity =
       typeof quantity === "number"
         ? quantity
@@ -86,6 +93,8 @@ export async function PATCH(
       typeof polylined === "boolean"
         ? polylined
         : String(polylined).toLowerCase() === "yes" || String(polylined).toLowerCase() === "true";
+
+    const resolvedProductType = (productType || tobaccoType)?.trim() || null;
 
     const updateData = {
       ...(tobaccoSupplier !== undefined && { tobaccoSupplier: tobaccoSupplier?.trim() || null }),
@@ -98,8 +107,12 @@ export async function PATCH(
         fumigationContractor: fumigationContractor?.trim() || "Primon Enterprises Limited",
       }),
       ...(cropYear !== undefined && { cropYear: cropYear?.trim() || null }),
-      ...(tobaccoType !== undefined && { tobaccoType: tobaccoType?.trim() || null }),
+      ...((tobaccoType !== undefined || productType !== undefined) && {
+        tobaccoType: resolvedProductType,
+        productType: resolvedProductType,
+      }),
       ...(netWeight !== undefined && { netWeight: parsedNetWeight }),
+      ...(grossWeight !== undefined && { grossWeight: parsedGrossWeight }),
       ...(quantity !== undefined && { quantity: parsedQuantity }),
       ...(polylined !== undefined && { polylined: parsedPolylined }),
       ...(gradeName !== undefined && { gradeName: gradeName?.trim() || null }),

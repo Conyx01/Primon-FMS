@@ -11,6 +11,7 @@ type ApiFcc = {
     code: string;
     source?: string;
     cropType: WorkOrder["cropType"];
+    customProduct?: string | null;
     scale?: string;
     salesOrderNo: string | null;
     shipmentNo: string | null;
@@ -26,7 +27,9 @@ type ApiFcc = {
     fumigationContractor: string | null;
     cropYear: string | null;
     tobaccoType: string | null;
+    productType?: string | null;
     netWeight: number | null;
+    grossWeight?: number | null;
     quantity: number | null;
     polylined: boolean | null;
     gradeName: string | null;
@@ -81,7 +84,9 @@ function emptySi(): ShippingInstructions {
     fumigationContractor: "Primon Enterprises Limited",
     cropYear: "",
     tobaccoType: "",
+    productType: "",
     netWeight: "",
+    grossWeight: "",
     quantity: "",
     polylined: "No",
     gradeName: "",
@@ -105,7 +110,9 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
         fumigationContractor: siRow.fumigationContractor ?? "Primon Enterprises Limited",
         cropYear: siRow.cropYear ?? "",
         tobaccoType: siRow.tobaccoType ?? "",
+        productType: siRow.productType ?? siRow.tobaccoType ?? "",
         netWeight: siRow.netWeight != null ? String(siRow.netWeight) : "",
+        grossWeight: siRow.grossWeight != null ? String(siRow.grossWeight) : "",
         quantity: siRow.quantity != null ? String(siRow.quantity) : "",
         polylined: siRow.polylined ? "Yes" : "No",
         gradeName: siRow.gradeName ?? "",
@@ -135,6 +142,7 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
           : "auto_generated",
     client: fcc.workOrder.client?.name ?? "—",
     cropType: fcc.workOrder.cropType,
+    customProduct: fcc.workOrder.customProduct ?? undefined,
     scale: fcc.workOrder.scale === "smallholder" ? "smallholder" : "industrial",
     status: fcc.status,
     createdAt: fcc.workOrder.createdAt,

@@ -45,6 +45,8 @@ type FccPayload = {
   workOrder: {
     id: string;
     code: string;
+    cropType?: string;
+    customProduct?: string | null;
     client?: { id: string; name: string; email: string } | null;
   };
   fumigationDescription?: {
@@ -60,7 +62,9 @@ type FccPayload = {
     fumigationContractor: string | null;
     cropYear: string | null;
     tobaccoType: string | null;
+    productType?: string | null;
     netWeight: number | null;
+    grossWeight?: number | null;
     quantity: number | null;
     polylined: boolean | null;
     gradeName: string | null;
@@ -110,7 +114,9 @@ function siFromFcc(fcc: FccPayload): ShippingInstructions {
       fumigationContractor: "Primon Enterprises Limited",
       cropYear: "",
       tobaccoType: "",
+      productType: "",
       netWeight: "",
+      grossWeight: "",
       quantity: "",
       polylined: "No",
       gradeName: "",
@@ -130,7 +136,9 @@ function siFromFcc(fcc: FccPayload): ShippingInstructions {
     fumigationContractor: row.fumigationContractor ?? "Primon Enterprises Limited",
     cropYear: row.cropYear ?? "",
     tobaccoType: row.tobaccoType ?? "",
+    productType: row.productType ?? row.tobaccoType ?? "",
     netWeight: row.netWeight != null ? String(row.netWeight) : "",
+    grossWeight: row.grossWeight != null ? String(row.grossWeight) : "",
     quantity: row.quantity != null ? String(row.quantity) : "",
     polylined: row.polylined ? "Yes" : "No",
     gradeName: row.gradeName ?? "",
@@ -177,10 +185,11 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [signers, setSigners] = useState({
-    supervising_fumigator: "",
+    supervising_fumigator: "Prince Chiwalo",
     supplier_rep: "",
     certifying_officer: "",
   });
+  const [isOtherFumigator, setIsOtherFumigator] = useState(false);
   const [clientOptions, setClientOptions] = useState<
     { id: string; name: string; email: string }[]
   >([]);
@@ -200,6 +209,19 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       setDurationHours(
         closeout.durationHours != null ? String(closeout.durationHours) : ""
       );
+    }
+    const existingSignatures = data.fcc.signatures || [];
+    const fumSig = existingSignatures.find((s: any) => s.role === "supervising_fumigator")?.signerName;
+    const supSig = existingSignatures.find((s: any) => s.role === "supplier_rep")?.signerName;
+    const certSig = existingSignatures.find((s: any) => s.role === "certifying_officer")?.signerName;
+    if (fumSig || supSig || certSig) {
+      const isPrince = !fumSig || /prince\s+chiwalo/i.test(fumSig);
+      setIsOtherFumigator(!isPrince);
+      setSigners({
+        supervising_fumigator: fumSig || "Prince Chiwalo",
+        supplier_rep: supSig || "",
+        certifying_officer: certSig || "",
+      });
     }
   }, [params.id]);
 
@@ -933,12 +955,39 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             </p>
             <div className="grid gap-5 sm:grid-cols-3">
               <FormRow label="Supervising Fumigator" required>
-                <TextInput
-                  value={signers.supervising_fumigator}
-                  onChange={(e) =>
-                    setSigners({ ...signers, supervising_fumigator: e.target.value })
-                  }
-                />
+                <div className="space-y-2">
+                  <Select
+                    value={isOtherFumigator ? "__other__" : "Prince Chiwalo"}
+                    onChange={(e) => {
+                      if (e.target.value === "__other__") {
+                        setIsOtherFumigator(true);
+                        setSigners((s) => ({ ...s, supervising_fumigator: "" }));
+                      } else {
+                        setIsOtherFumigator(false);
+                        setSigners((s) => ({ ...s, supervising_fumigator: "Prince Chiwalo" }));
+                      }
+                    }}
+                  >
+                    <option value="Prince Chiwalo">Prince Chiwalo</option>
+                    <option value="__other__">Other supervising fumigator…</option>
+                  </Select>
+                  {isOtherFumigator && (
+                    <TextInput
+                      placeholder="Enter supervising fumigator name"
+                      value={signers.supervising_fumigator}
+                      onChange={(e) =>
+                        setSigners({ ...signers, supervising_fumigator: e.target.value })
+                      }
+                    />
+                  )}
+                  {!isOtherFumigator && signers.supervising_fumigator === "Prince Chiwalo" && (
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-primon-50/60 px-2.5 py-1.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/signature.png" alt="Signature preview" className="h-6 w-auto object-contain" />
+                      <span className="text-[11px] text-muted">Inbuilt signature attached</span>
+                    </div>
+                  )}
+                </div>
               </FormRow>
               <FormRow label="For the Supplier" required>
                 <TextInput

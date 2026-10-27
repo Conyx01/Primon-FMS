@@ -37,8 +37,10 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
           consignee: si.consignee,
           consigneeAddress: si.consigneeAddress,
           cropYear: si.cropYear,
-          tobaccoType: si.tobaccoType,
+          tobaccoType: si.productType || si.tobaccoType,
+          productType: si.productType || si.tobaccoType,
           netWeight: si.netWeight,
+          grossWeight: si.grossWeight,
           quantity: si.quantity,
           polylined: si.polylined,
           gradeName: si.gradeName,
@@ -73,7 +75,7 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
           : "Complete consignor (supplier) and consignee details here. Change any field and update to save again."}
       </p>
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
-        <FormRow label="Consignor (tobacco / grain supplier)">
+        <FormRow label="Consignor / Supplier">
           <TextInput
             value={si.tobaccoSupplier}
             disabled={locked}
@@ -108,18 +110,34 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
             onChange={(e) => setSi({ ...si, cropYear: e.target.value })}
           />
         </FormRow>
-        <FormRow label="Tobacco / grain type">
+        <FormRow label="Product type">
           <TextInput
-            value={si.tobaccoType}
+            placeholder="e.g. Flue-cured, White Maize, Empty Sacks"
+            value={si.productType ?? si.tobaccoType}
             disabled={locked}
-            onChange={(e) => setSi({ ...si, tobaccoType: e.target.value })}
+            onChange={(e) =>
+              setSi({
+                ...si,
+                productType: e.target.value,
+                tobaccoType: e.target.value,
+              })
+            }
           />
         </FormRow>
         <FormRow label="Net weight">
           <TextInput
+            placeholder="e.g. 126,000 KGS"
             value={si.netWeight}
             disabled={locked}
             onChange={(e) => setSi({ ...si, netWeight: e.target.value })}
+          />
+        </FormRow>
+        <FormRow label="Gross weight">
+          <TextInput
+            placeholder="e.g. 132,000 KGS"
+            value={si.grossWeight}
+            disabled={locked}
+            onChange={(e) => setSi({ ...si, grossWeight: e.target.value })}
           />
         </FormRow>
         <FormRow label="Quantity">

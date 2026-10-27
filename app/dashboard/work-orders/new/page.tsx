@@ -24,7 +24,7 @@ function toFumigantName(name: string): FumigantName {
 }
 
 function toCropType(value: string): CropType | "both" {
-  if (value === "grain" || value === "both") return value;
+  if (value === "grain" || value === "both" || value === "other") return value;
   return "tobacco";
 }
 
@@ -37,7 +37,9 @@ const emptySi: ShippingInstructions = {
   consigneeAddress: "",
   cropYear: "",
   tobaccoType: "",
+  productType: "",
   netWeight: "",
+  grossWeight: "",
   quantity: "",
   polylined: "No",
   gradeName: "",
@@ -51,7 +53,7 @@ const emptySi: ShippingInstructions = {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Guess crop type from a free-text cropOrService string. */
-function guessCropType(cropOrService: string): CropType {
+function guessCropType(cropOrService: string): { cropType: CropType; customProduct?: string } {
   const lower = cropOrService.toLowerCase();
   if (
     lower.includes("grain") ||
@@ -60,9 +62,12 @@ function guessCropType(cropOrService: string): CropType {
     lower.includes("cereal") ||
     lower.includes("wheat")
   ) {
-    return "grain";
+    return { cropType: "grain" };
   }
-  return "tobacco";
+  if (lower.includes("tobacco")) {
+    return { cropType: "tobacco" };
+  }
+  return { cropType: "other", customProduct: cropOrService };
 }
 
 /** Guess scale from a free-text cropOrService string. */
@@ -146,6 +151,7 @@ function NewWorkOrderWizard() {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [cropType, setCropType] = useState<CropType>("tobacco");
+  const [customProduct, setCustomProduct] = useState("");
   const [scale, setScale] = useState<"industrial" | "smallholder" | "household">("industrial");
   const [hasCode, setHasCode] = useState(false);
   const [suppliedCode, setSuppliedCode] = useState("");
@@ -215,7 +221,9 @@ function NewWorkOrderWizard() {
         if (p.name) setInviteName(p.name);
         if (p.email) setInviteEmail(p.email);
         if (p.cropOrService) {
-          setCropType(guessCropType(p.cropOrService));
+          const guessed = guessCropType(p.cropOrService);
+          setCropType(guessed.cropType);
+          if (guessed.customProduct) setCustomProduct(guessed.customProduct);
           setScale(guessScale(p.cropOrService));
         }
 
@@ -332,6 +340,7 @@ function NewWorkOrderWizard() {
         setCreatedCode(wo.code);
         setClientId(wo.clientId || wo.client?.id || "");
         setCropType(wo.cropType);
+        setCustomProduct(wo.customProduct || "");
         setScale(wo.scale || "industrial");
         setSalesOrderNo(wo.salesOrderNo || "");
         setShipmentNo(wo.shipmentNo || "");
@@ -350,7 +359,9 @@ function NewWorkOrderWizard() {
               siRow.fumigationContractor ?? "Primon Enterprises Limited",
             cropYear: siRow.cropYear ?? "",
             tobaccoType: siRow.tobaccoType ?? "",
+            productType: siRow.productType ?? siRow.tobaccoType ?? "",
             netWeight: siRow.netWeight != null ? String(siRow.netWeight) : "",
+            grossWeight: siRow.grossWeight != null ? String(siRow.grossWeight) : "",
             quantity: siRow.quantity != null ? String(siRow.quantity) : "",
             polylined: siRow.polylined ? "Yes" : "No",
             gradeName: siRow.gradeName ?? "",
@@ -383,6 +394,10 @@ function NewWorkOrderWizard() {
       throw new Error("Select or invite a client so they can see this job in the portal.");
     }
 
+    if (cropType === "other" && !customProduct.trim()) {
+      throw new Error("Please specify the commodity / product name.");
+    }
+
     const res = await fetch("/api/work-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -394,6 +409,7 @@ function NewWorkOrderWizard() {
             ? "client_supplied"
             : "auto_generated",
         cropType,
+        customProduct: cropType === "other" ? customProduct.trim() : undefined,
         scale,
         clientId,
         salesOrderNo: salesOrderNo.trim() || undefined,
@@ -420,7 +436,13 @@ function NewWorkOrderWizard() {
   }
 
   async function saveShippingInstructions(targetFccId: string) {
-    if (!si.tobaccoSupplier && !si.consignee && !si.cropYear && !si.tobaccoType) {
+    if (
+      !si.tobaccoSupplier &&
+      !si.consignee &&
+      !si.cropYear &&
+      !si.tobaccoType &&
+      !si.productType
+    ) {
       return;
     }
     const res = await fetch(`/api/fccs/${targetFccId}/si`, {
@@ -428,6 +450,8 @@ function NewWorkOrderWizard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...si,
+        tobaccoType: si.productType || si.tobaccoType,
+        productType: si.productType || si.tobaccoType,
         fumigationContractor: "Primon Enterprises Limited",
       }),
     });
@@ -631,23 +655,55 @@ function NewWorkOrderWizard() {
               </div>
 
               <div>
-                <Label>Crop type</Label>
-                <div className="flex gap-3">
+                <Label>Crop / Commodity type</Label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <RadioCard
                     active={cropType === "tobacco"}
-                    onClick={() => setCropType("tobacco")}
+                    onClick={() => {
+                      setCropType("tobacco");
+                      setCustomProduct("");
+                    }}
                     icon={Leaf}
                     title="Tobacco"
                     desc="Flue-cured, burley and related grades"
                   />
                   <RadioCard
                     active={cropType === "grain"}
-                    onClick={() => setCropType("grain")}
+                    onClick={() => {
+                      setCropType("grain");
+                      setCustomProduct("");
+                    }}
                     icon={Wheat}
                     title="Grain"
                     desc="Maize, sorghum and post-harvest stock"
                   />
+                  <RadioCard
+                    active={cropType === "other"}
+                    onClick={() => setCropType("other")}
+                    icon={Box}
+                    title="Specify"
+                    desc="Empty sacks, packaging or other commodities"
+                  />
                 </div>
+                {cropType === "other" && (
+                  <div className="mt-3">
+                    <FormRow label="Specify commodity / product" required>
+                      <TextInput
+                        placeholder="e.g. Empty Sacks, Packaging Material, Beans"
+                        value={customProduct}
+                        disabled={identityLocked}
+                        onChange={(e) => {
+                          setCustomProduct(e.target.value);
+                          setSi((prev) => ({
+                            ...prev,
+                            productType: e.target.value,
+                            tobaccoType: e.target.value,
+                          }));
+                        }}
+                      />
+                    </FormRow>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -759,7 +815,7 @@ function NewWorkOrderWizard() {
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <FormRow label="Consignor (tobacco / grain supplier)">
+                <FormRow label="Consignor / Supplier">
                   <TextInput value={si.tobaccoSupplier} onChange={(e) => setSi({ ...si, tobaccoSupplier: e.target.value })} />
                 </FormRow>
                 <FormRow label="Consignor address">
@@ -774,11 +830,24 @@ function NewWorkOrderWizard() {
                 <FormRow label="Crop year">
                   <TextInput placeholder="2026 Crop" value={si.cropYear} onChange={(e) => setSi({ ...si, cropYear: e.target.value })} />
                 </FormRow>
-                <FormRow label="Tobacco / grain type">
-                  <TextInput value={si.tobaccoType} onChange={(e) => setSi({ ...si, tobaccoType: e.target.value })} />
+                <FormRow label="Product type">
+                  <TextInput
+                    placeholder="e.g. Flue-cured, White Maize, Empty Sacks"
+                    value={si.productType ?? si.tobaccoType}
+                    onChange={(e) =>
+                      setSi({
+                        ...si,
+                        productType: e.target.value,
+                        tobaccoType: e.target.value,
+                      })
+                    }
+                  />
                 </FormRow>
                 <FormRow label="Net weight">
                   <TextInput placeholder="e.g. 126,000 KGS" value={si.netWeight} onChange={(e) => setSi({ ...si, netWeight: e.target.value })} />
+                </FormRow>
+                <FormRow label="Gross weight">
+                  <TextInput placeholder="e.g. 132,000 KGS" value={si.grossWeight} onChange={(e) => setSi({ ...si, grossWeight: e.target.value })} />
                 </FormRow>
                 <FormRow label="Quantity">
                   <TextInput placeholder="e.g. 630 Cartons" value={si.quantity} onChange={(e) => setSi({ ...si, quantity: e.target.value })} />
@@ -909,7 +978,7 @@ function NewWorkOrderWizard() {
                   {displayCode} · {clientLabel || "No client attached"}
                 </p>
                 <p className="mt-0.5 text-sm capitalize text-muted">
-                  {cropType} · {scale}
+                  {cropType === "other" ? (customProduct || "Other") : cropType} · {scale}
                 </p>
               </div>
 
@@ -952,7 +1021,11 @@ function NewWorkOrderWizard() {
             {step < STEPS.length - 1 ? (
               <Button
                 onClick={next}
-                disabled={submitting || (step === 0 && !clientId)}
+                disabled={
+                  submitting ||
+                  (step === 0 &&
+                    (!clientId || (cropType === "other" && !customProduct.trim())))
+                }
               >
                 {submitting && step === 0
                   ? "Creating draft…"
