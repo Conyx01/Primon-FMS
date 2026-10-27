@@ -81,6 +81,7 @@ export async function POST(
         gasReadings: true,
         closeout: true,
         shippingInstructions: true,
+        fumigationDescription: true,
         workOrder: true,
       },
     });
@@ -90,6 +91,12 @@ export async function POST(
     }
     if (fcc.status === FccStatus.certified) {
       return NextResponse.json({ error: "This FCC is already certified" }, { status: 409 });
+    }
+    if (!fcc.fumigationDescription) {
+      return NextResponse.json(
+        { error: "Fumigation description is required before certification" },
+        { status: 409 }
+      );
     }
 
     const readings = fcc.gasReadings;

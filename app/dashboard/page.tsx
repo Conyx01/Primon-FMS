@@ -225,7 +225,7 @@ export default function DashboardPage() {
                               <Link
                                 href={
                                   status === "draft"
-                                    ? "/dashboard/work-orders/new"
+                                    ? `/dashboard/work-orders/new?id=${w.id}`
                                     : `/dashboard/monitor/${w.id}`
                                 }
                                 className="text-xs font-medium text-primon-700 hover:text-primon-900"

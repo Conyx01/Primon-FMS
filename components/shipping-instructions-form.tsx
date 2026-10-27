@@ -18,6 +18,10 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const hasExistingSi = Boolean(
+    initial.tobaccoSupplier?.trim() || initial.consignee?.trim() || initial.complete
+  );
+  const saveLabel = hasExistingSi || saved ? "Update shipping instructions" : "Save shipping instructions";
 
   async function save() {
     setSaving(true);
@@ -66,17 +70,17 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
       <p className="mt-1 text-xs text-muted">
         {locked
           ? "These details are locked because the certificate is certified."
-          : "You can complete supplier, consignee and cargo details here. Fumigation does not wait on this section."}
+          : "Complete consignor (supplier) and consignee details here. Change any field and update to save again."}
       </p>
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
-        <FormRow label="Tobacco / grain supplier">
+        <FormRow label="Consignor (tobacco / grain supplier)">
           <TextInput
             value={si.tobaccoSupplier}
             disabled={locked}
             onChange={(e) => setSi({ ...si, tobaccoSupplier: e.target.value })}
           />
         </FormRow>
-        <FormRow label="Supplier address">
+        <FormRow label="Consignor address">
           <TextInput
             value={si.supplierAddress}
             disabled={locked}
@@ -173,12 +177,12 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
       </div>
       {error && <p className="mt-4 text-xs text-status-critical">{error}</p>}
       {saved && !error && (
-        <p className="mt-4 text-xs text-status-compliant">Shipping instructions saved.</p>
+        <p className="mt-4 text-xs text-status-compliant">Shipping instructions updated.</p>
       )}
       {!locked && (
         <div className="mt-5">
           <Button onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save shipping instructions"}
+            {saving ? "Saving…" : saveLabel}
           </Button>
         </div>
       )}

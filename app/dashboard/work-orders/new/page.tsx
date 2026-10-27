@@ -17,6 +17,7 @@ import {
   ShippingInstructions,
   StockFormulation,
 } from "@/lib/types";
+import { resumeWizardStep } from "@/lib/si-complete";
 
 function toFumigantName(name: string): FumigantName {
   return /magnesium/i.test(name) ? "Magnesium Phosphide" : "Aluminium Phosphide";
@@ -127,8 +128,13 @@ function NewWorkOrderWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromSubmissionId = searchParams.get("fromSubmission");
+  const resumeId = searchParams.get("id");
 
   const [step, setStep] = useState(0);
+  const [workOrderId, setWorkOrderId] = useState<string | null>(null);
+  const [fccId, setFccId] = useState<string | null>(null);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(Boolean(resumeId));
 
   // Step 0 fields
   const [clientId, setClientId] = useState("");
@@ -153,6 +159,7 @@ function NewWorkOrderWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stock, setStock] = useState<StockFormulation[]>([]);
+  const identityLocked = Boolean(workOrderId);
 
   // Load live stock
   useEffect(() => {
@@ -292,103 +299,240 @@ function NewWorkOrderWizard() {
 
   const formOptions = availableFormulations(fumigantName, cropType, stock);
   const totalFumigantUsed = Math.round(dose * totalVolume);
+  const displayCode = createdCode || (hasCode && suppliedCode ? suppliedCode : autoCode);
 
-  function next() { setStep((s) => Math.min(STEPS.length - 1, s + 1)); }
-  function back() { setStep((s) => Math.max(0, s - 1)); }
+  // Resume an existing draft from overview Continue (?id=)
+  useEffect(() => {
+    if (!resumeId) return;
+    let cancelled = false;
+    (async () => {
+      setResumeLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/work-orders/${resumeId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load work order");
+        if (cancelled) return;
 
-  async function createWorkOrder() {
-    setSubmitting(true);
-    setError(null);
+        const wo = data.workOrder;
+        const fcc = wo.fcc;
+        if (!fcc) throw new Error("This work order has no FCC draft");
 
-    try {
-      if (!clientId) {
-        throw new Error("Select or invite a client so they can see this job in the portal.");
+        const nextStep = resumeWizardStep({
+          shippingInstructions: fcc.shippingInstructions,
+          fumigationDescription: fcc.fumigationDescription,
+        });
+        if (nextStep === null) {
+          router.replace(`/dashboard/monitor/${wo.id}`);
+          return;
+        }
+
+        setWorkOrderId(wo.id);
+        setFccId(fcc.id);
+        setCreatedCode(wo.code);
+        setClientId(wo.clientId || wo.client?.id || "");
+        setCropType(wo.cropType);
+        setScale(wo.scale || "industrial");
+        setSalesOrderNo(wo.salesOrderNo || "");
+        setShipmentNo(wo.shipmentNo || "");
+        setDeliveryNo(wo.deliveryNo || "");
+        setHasCode(wo.source === "client_supplied");
+        if (wo.source === "client_supplied") setSuppliedCode(wo.code);
+
+        const siRow = fcc.shippingInstructions;
+        if (siRow) {
+          setSi({
+            tobaccoSupplier: siRow.tobaccoSupplier ?? "",
+            supplierAddress: siRow.tobaccoSupplierAddress ?? "",
+            consignee: siRow.consignee ?? "",
+            consigneeAddress: siRow.consigneeAddress ?? "",
+            fumigationContractor:
+              siRow.fumigationContractor ?? "Primon Enterprises Limited",
+            cropYear: siRow.cropYear ?? "",
+            tobaccoType: siRow.tobaccoType ?? "",
+            netWeight: siRow.netWeight != null ? String(siRow.netWeight) : "",
+            quantity: siRow.quantity != null ? String(siRow.quantity) : "",
+            polylined: siRow.polylined ? "Yes" : "No",
+            gradeName: siRow.gradeName ?? "",
+            caseNos: siRow.caseNos ?? "",
+            countryOfOrigin: siRow.countryOfOrigin ?? "Malawi",
+            location: siRow.location ?? "",
+            warehouseSection: siRow.warehouseSection ?? "",
+            complete: Boolean(siRow.tobaccoSupplier && siRow.consignee),
+          });
+        }
+
+        setStep(nextStep);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to resume work order");
+        }
+      } finally {
+        if (!cancelled) setResumeLoading(false);
       }
-      // 1. Create Work Order + linked FCC draft
-      const res = await fetch("/api/work-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: hasCode && suppliedCode ? suppliedCode.trim() : undefined,
-          source: fromSubmissionId
-            ? "website"
-            : hasCode
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeId, router]);
+
+  async function ensureWorkOrderCreated(): Promise<{ woId: string; fccId: string }> {
+    if (workOrderId && fccId) return { woId: workOrderId, fccId };
+
+    if (!clientId) {
+      throw new Error("Select or invite a client so they can see this job in the portal.");
+    }
+
+    const res = await fetch("/api/work-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: hasCode && suppliedCode ? suppliedCode.trim() : undefined,
+        source: fromSubmissionId
+          ? "website"
+          : hasCode
             ? "client_supplied"
             : "auto_generated",
-          cropType,
-          scale,
-          clientId,
-          salesOrderNo: salesOrderNo.trim() || undefined,
-          shipmentNo: shipmentNo.trim() || undefined,
-          deliveryNo: deliveryNo.trim() || undefined,
-        }),
-      });
+        cropType,
+        scale,
+        clientId,
+        salesOrderNo: salesOrderNo.trim() || undefined,
+        shipmentNo: shipmentNo.trim() || undefined,
+        deliveryNo: deliveryNo.trim() || undefined,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to create work order");
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create work order");
+    const woId = data.workOrder.id as string;
+    const nextFccId = (data.workOrder.fcc?.id || data.workOrder.id) as string;
+    setWorkOrderId(woId);
+    setFccId(nextFccId);
+    setCreatedCode(data.workOrder.code);
 
-      const fccId = data.workOrder.fcc?.id || data.workOrder.id;
+    if (fromSubmissionId) {
+      fetch(`/api/intake/pending/${fromSubmissionId}/convert`, { method: "POST" }).catch(
+        (e) => console.error("Failed to mark intake submission converted:", e)
+      );
+    }
 
-      // 2. Save Shipping Instructions if provided
-      if (si.tobaccoSupplier || si.consignee) {
-        await fetch(`/api/fccs/${fccId}/si`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...si,
-            fumigationContractor: "Primon Enterprises Limited",
-          }),
-        });
+    return { woId, fccId: nextFccId };
+  }
+
+  async function saveShippingInstructions(targetFccId: string) {
+    if (!si.tobaccoSupplier && !si.consignee && !si.cropYear && !si.tobaccoType) {
+      return;
+    }
+    const res = await fetch(`/api/fccs/${targetFccId}/si`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...si,
+        fumigationContractor: "Primon Enterprises Limited",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to save shipping instructions");
+  }
+
+  async function saveFumigationDescription(targetFccId: string) {
+    if (!formulation || totalVolume <= 0) {
+      throw new Error(
+        "Fumigation description is required: select a formulation and enter total volume so stock can be deducted."
+      );
+    }
+    const descRes = await fetch(`/api/fccs/${targetFccId}/fumigation-description`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fumigationType,
+        fumigantName,
+        formulationName: formulation,
+        doseGm3: dose,
+        totalVolumeM3: totalVolume,
+        totalFumigantUsedG: totalFumigantUsed,
+      }),
+    });
+    if (!descRes.ok) {
+      const descData = await descRes.json();
+      throw new Error(descData.error || "Failed to save fumigation description");
+    }
+  }
+
+  async function next() {
+    setError(null);
+    if (step === 0) {
+      setSubmitting(true);
+      try {
+        await ensureWorkOrderCreated();
+        setStep(1);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to create work order");
+      } finally {
+        setSubmitting(false);
       }
-
-      // 3. Save Fumigation Description (deducts stock & sets status to in_progress)
-      if (formulation && totalVolume > 0) {
-        const descRes = await fetch(`/api/fccs/${fccId}/fumigation-description`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fumigationType,
-            fumigantName,
-            formulationName: formulation,
-            doseGm3: dose,
-            totalVolumeM3: totalVolume,
-            totalFumigantUsedG: totalFumigantUsed,
-          }),
-        });
-
-        if (!descRes.ok) {
-          const descData = await descRes.json();
-          throw new Error(descData.error || "Failed to save fumigation description");
-        }
+      return;
+    }
+    if (step === 1 && fccId) {
+      setSubmitting(true);
+      try {
+        await saveShippingInstructions(fccId);
+        setStep(2);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to save shipping instructions");
+      } finally {
+        setSubmitting(false);
       }
+      return;
+    }
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  }
 
-      // 4. Mark the originating intake submission as converted (non-blocking)
-      if (fromSubmissionId) {
-        fetch(`/api/intake/pending/${fromSubmissionId}/convert`, {
-          method: "POST",
-        }).catch((e) =>
-          console.error("Failed to mark intake submission converted:", e)
-        );
-      }
+  function back() {
+    setError(null);
+    setStep((s) => Math.max(0, s - 1));
+  }
 
-      router.push(`/dashboard/monitor/${data.workOrder.id}`);
+  async function finishWorkOrder() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const ids = await ensureWorkOrderCreated();
+      await saveShippingInstructions(ids.fccId);
+      await saveFumigationDescription(ids.fccId);
+      router.push(`/dashboard/monitor/${ids.woId}`);
     } catch (err: unknown) {
-      console.error("Error creating work order:", err);
+      console.error("Error finishing work order:", err);
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to create work order. Please check network or input parameters."
+          : "Failed to save work order. Please check network or input parameters."
       );
     } finally {
       setSubmitting(false);
     }
   }
 
+  if (resumeLoading) {
+    return (
+      <div>
+        <Topbar title="Continue work order" description="Loading draft…" />
+        <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10">
+          <p className="text-sm text-muted">Loading work order…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <Topbar
-        title="New work order"
-        description="Build the Fumigation Conformance Certificate step by step"
+        title={workOrderId ? `Continue ${displayCode}` : "New work order"}
+        description={
+          workOrderId
+            ? "Resume shipping instructions or fumigation description for this draft"
+            : "Attach a client to create the draft, then complete SI and fumigation"
+        }
       />
 
       <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10">
@@ -399,6 +543,17 @@ function NewWorkOrderWizard() {
             <p className="text-xs leading-relaxed text-brass-700">
               {intakeBannerText}. Review the pre-filled fields below and adjust
               as needed before submitting.
+            </p>
+          </div>
+        )}
+
+        {workOrderId && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-primon-200 bg-primon-50 p-4">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primon-700" />
+            <p className="text-xs leading-relaxed text-primon-800">
+              Draft <span className="font-medium">{displayCode}</span> exists and is visible
+              to the attached client in the portal. They can fill shipping instructions
+              there, or you can complete SI and fumigation here.
             </p>
           </div>
         )}
@@ -420,6 +575,7 @@ function NewWorkOrderWizard() {
                 <FormRow label="Client (portal login)" required>
                   <Select
                     value={clientId}
+                    disabled={identityLocked}
                     onChange={(e) => setClientId(e.target.value)}
                   >
                     <option value="">Select a client…</option>
@@ -431,12 +587,13 @@ function NewWorkOrderWizard() {
                   </Select>
                 </FormRow>
                 <p className="mt-3 text-[11px] text-muted">
-                  The selected account is who sees this work order in /portal.
-                  {clientId
-                    ? " Invite is hidden because a client is already selected."
-                    : " If they do not have a login yet, invite them below."}
+                  {identityLocked
+                    ? "Client is locked on this draft. They can already see the job in /portal."
+                    : clientId
+                      ? "Invite is hidden because a client is already selected."
+                      : "Select or invite a client. Creating the draft makes the job visible in their portal."}
                 </p>
-                {!clientId && (
+                {!clientId && !identityLocked && (
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <FormRow label="Invite name">
                       <TextInput
@@ -595,17 +752,17 @@ function NewWorkOrderWizard() {
               <div className="flex items-start gap-3 rounded-xl border border-brass-300 bg-brass-100/60 p-4">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-brass-600" />
                 <p className="text-xs leading-relaxed text-brass-700">
-                  Optional at this stage. Fumigation can begin and gas readings can be
-                  recorded before shipping instructions are complete — the client can
-                  finish this section from their portal at any time before certification.
+                  Optional here if the client will fill consignor/consignee details in
+                  their portal. If Primon is completing the full certificate, fill SI now
+                  then continue to fumigation. You can update SI later until certification.
                 </p>
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <FormRow label="Tobacco / grain supplier">
+                <FormRow label="Consignor (tobacco / grain supplier)">
                   <TextInput value={si.tobaccoSupplier} onChange={(e) => setSi({ ...si, tobaccoSupplier: e.target.value })} />
                 </FormRow>
-                <FormRow label="Supplier address">
+                <FormRow label="Consignor address">
                   <TextInput value={si.supplierAddress} onChange={(e) => setSi({ ...si, supplierAddress: e.target.value })} />
                 </FormRow>
                 <FormRow label="Consignee">
@@ -653,6 +810,13 @@ function NewWorkOrderWizard() {
 
           {step === 2 && (
             <div className="space-y-6 animate-reveal-up">
+              <div className="flex items-start gap-3 rounded-xl border border-primon-200 bg-primon-50 p-4">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-primon-700" />
+                <p className="text-xs leading-relaxed text-primon-800">
+                  Required. Saving fumigation description deducts stock and is needed
+                  before Date Fumigant Placed / certification.
+                </p>
+              </div>
               <div>
                 <Label>Type of fumigation</Label>
                 <div className="flex gap-3">
@@ -742,7 +906,7 @@ function NewWorkOrderWizard() {
               <div>
                 <p className="text-xs text-muted">Work order</p>
                 <p className="mt-1 font-display text-lg text-primon-950">
-                  {hasCode && suppliedCode ? suppliedCode : autoCode} · {clientLabel || "No client attached"}
+                  {displayCode} · {clientLabel || "No client attached"}
                 </p>
                 <p className="mt-0.5 text-sm capitalize text-muted">
                   {cropType} · {scale}
@@ -761,7 +925,8 @@ function NewWorkOrderWizard() {
                 <div>
                   <p className="text-xs font-medium text-primon-800">Fumigation description</p>
                   <p className="mt-1 text-sm text-muted capitalize">
-                    {fumigationType.replace("_", " ")} · {fumigantName} · {formulation || "no formulation selected"}
+                    {fumigationType.replace("_", " ")} · {fumigantName} ·{" "}
+                    {formulation || "required — go back if missing"}
                   </p>
                   <p className="text-sm text-muted">
                     {dose}g/m³ dose · {totalVolume}m³ · {totalFumigantUsed}g total
@@ -772,28 +937,36 @@ function NewWorkOrderWizard() {
               <div className="flex items-start gap-3 rounded-xl border border-primon-200 bg-primon-50 p-4">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-primon-700" />
                 <p className="text-xs leading-relaxed text-primon-800">
-                  Creating this work order deducts {totalFumigantUsed || 0}g of{" "}
+                  Saving deducts {totalFumigantUsed || 0}g of{" "}
                   {formulation || "the selected formulation"} from stock and opens the
-                  6-day gas-reading monitor for your Fumigation Supervisor.
-                  {fromSubmissionId && (
-                    <> The originating website submission will be marked as converted.</>
-                  )}
+                  gas-reading monitor. Fumigation description is required.
                 </p>
               </div>
             </div>
           )}
 
           <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
-            <Button variant="ghost" onClick={back} disabled={step === 0}>
+            <Button variant="ghost" onClick={back} disabled={step === 0 || submitting}>
               Back
             </Button>
             {step < STEPS.length - 1 ? (
-              <Button onClick={next} disabled={step === 0 && !clientId}>
-                Continue
+              <Button
+                onClick={next}
+                disabled={submitting || (step === 0 && !clientId)}
+              >
+                {submitting && step === 0
+                  ? "Creating draft…"
+                  : step === 0
+                    ? "Create draft & continue"
+                    : "Continue"}
               </Button>
             ) : (
-              <Button variant="brass" onClick={createWorkOrder} disabled={submitting}>
-                {submitting ? "Creating..." : "Create work order & start fumigation"}
+              <Button
+                variant="brass"
+                onClick={finishWorkOrder}
+                disabled={submitting || !formulation || totalVolume <= 0}
+              >
+                {submitting ? "Saving…" : "Save fumigation & open monitor"}
               </Button>
             )}
           </div>

@@ -30,11 +30,21 @@ export async function POST(
       where: {
         OR: [{ id }, { workOrderId: id }, { workOrder: { code: id } }],
       },
-      include: { closeout: true, gasReadings: true },
+      include: { closeout: true, gasReadings: true, fumigationDescription: true },
     });
 
     if (!fcc) {
       return NextResponse.json({ error: "FCC record not found" }, { status: 404 });
+    }
+
+    if (!fcc.fumigationDescription) {
+      return NextResponse.json(
+        {
+          error:
+            "Save fumigation description (fumigant, formulation, dose and volume) before opening the monitoring window so stock can be deducted.",
+        },
+        { status: 409 }
+      );
     }
 
     if (fcc.gasReadings.length > 0) {

@@ -277,13 +277,6 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
           <Field label="Date Fumigant Placed" value={fmt(wo.datePlaced)} />
           <Field label="Aeration Began" value={fmt(wo.aerationBegan)} />
           <Field label="Aeration Completed" value={fmt(wo.aerationCompleted)} />
-          {wo.durationHours != null && (
-            <Field
-              label="Duration under Gas (hrs)"
-              value={String(wo.durationHours)}
-              className="col-span-3"
-            />
-          )}
         </div>
 
         {/* Readings table — horizontal (columns = days, rows = measurements) */}
@@ -361,6 +354,13 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
         <p className="mt-0.5 text-[7.5px] text-gray-400 italic">
           * Ambient temperature must be recorded for all days. Product temperature is recorded on Day 0 (pre-fumigation check) only.
         </p>
+        <div className="mt-1.5 grid grid-cols-3 gap-x-4 border border-gray-300 px-2 py-1 text-[9px]">
+          <Field
+            label="Hours under aeration"
+            value={wo.durationHours != null ? String(wo.durationHours) : "—"}
+            className="col-span-3"
+          />
+        </div>
       </section>
 
       {/* ── SECTION 5: CERTIFICATION ── */}

@@ -11,9 +11,11 @@ import { GasDayGauge } from "@/components/gas-day-gauge";
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { FormRow, Label, TextInput, Select } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/kpi";
-import { GasReading, FccStatus } from "@/lib/types";
+import { ShippingInstructionsForm } from "@/components/shipping-instructions-form";
+import { GasReading, FccStatus, ShippingInstructions } from "@/lib/types";
 import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
+import { isShippingInstructionsComplete } from "@/lib/si-complete";
 import {
   REQUIRED_SUCCESSFUL_GAS_DAYS,
   canCertifyGasReadings,
@@ -50,6 +52,24 @@ type FccPayload = {
     fumigant?: { name: string };
     formulation?: { name: string };
   } | null;
+  shippingInstructions?: {
+    tobaccoSupplier: string | null;
+    tobaccoSupplierAddress: string | null;
+    consignee: string | null;
+    consigneeAddress: string | null;
+    fumigationContractor: string | null;
+    cropYear: string | null;
+    tobaccoType: string | null;
+    netWeight: number | null;
+    quantity: number | null;
+    polylined: boolean | null;
+    gradeName: string | null;
+    caseNos: string | null;
+    countryOfOrigin: string | null;
+    location: string | null;
+    warehouseSection: string | null;
+    lockedAt?: string | null;
+  } | null;
   gasReadings: ApiReading[];
   closeout?: {
     datePlaced: string;
@@ -76,6 +96,50 @@ function mapReading(r: ApiReading): GasReading {
           loggedAt: r.correctiveAction.actionTakenAt,
         }
       : undefined,
+  };
+}
+
+function siFromFcc(fcc: FccPayload): ShippingInstructions {
+  const row = fcc.shippingInstructions;
+  if (!row) {
+    return {
+      tobaccoSupplier: "",
+      supplierAddress: "",
+      consignee: "",
+      consigneeAddress: "",
+      fumigationContractor: "Primon Enterprises Limited",
+      cropYear: "",
+      tobaccoType: "",
+      netWeight: "",
+      quantity: "",
+      polylined: "No",
+      gradeName: "",
+      caseNos: "",
+      countryOfOrigin: "Malawi",
+      location: "",
+      warehouseSection: "",
+      complete: false,
+      locked: fcc.status === "certified",
+    };
+  }
+  return {
+    tobaccoSupplier: row.tobaccoSupplier ?? "",
+    supplierAddress: row.tobaccoSupplierAddress ?? "",
+    consignee: row.consignee ?? "",
+    consigneeAddress: row.consigneeAddress ?? "",
+    fumigationContractor: row.fumigationContractor ?? "Primon Enterprises Limited",
+    cropYear: row.cropYear ?? "",
+    tobaccoType: row.tobaccoType ?? "",
+    netWeight: row.netWeight != null ? String(row.netWeight) : "",
+    quantity: row.quantity != null ? String(row.quantity) : "",
+    polylined: row.polylined ? "Yes" : "No",
+    gradeName: row.gradeName ?? "",
+    caseNos: row.caseNos ?? "",
+    countryOfOrigin: row.countryOfOrigin ?? "",
+    location: row.location ?? "",
+    warehouseSection: row.warehouseSection ?? "",
+    complete: isShippingInstructionsComplete(row),
+    locked: Boolean(row.lockedAt) || fcc.status === "certified",
   };
 }
 
@@ -198,7 +262,10 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const closeoutComplete = Boolean(
     fcc?.closeout?.aerationBegan && fcc?.closeout?.aerationCompleted
   );
-  const canCertify = allResolved && closeoutComplete && fcc?.status !== "certified";
+  const hasFumigation = Boolean(fcc?.fumigationDescription);
+  const canCertify =
+    allResolved && closeoutComplete && hasFumigation && fcc?.status !== "certified";
+  const canEditSi = canIssueCert && fcc?.status !== "certified";
   const attachedClient = fcc?.workOrder.client ?? null;
   const day0Ready =
     day0Reading != null &&
@@ -510,6 +577,34 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           )}
         </Card>
 
+        {!hasFumigation && (
+          <Card className="mb-6 border-status-critical/30 p-6">
+            <p className="font-display text-lg text-primon-950">Fumigation description required</p>
+            <p className="mt-1 text-xs text-muted">
+              Fumigant, formulation, dose and volume must be saved (stock is deducted then)
+              before Date Fumigant Placed or certification.
+            </p>
+            <div className="mt-4">
+              <Link href={`/dashboard/work-orders/new?id=${fcc.workOrder.id}`}>
+                <Button size="sm">Complete fumigation description</Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
+        <div className="mb-6">
+          <ShippingInstructionsForm
+            workOrderId={fcc.workOrder.id}
+            initial={{
+              ...siFromFcc(fcc),
+              locked: !canEditSi,
+            }}
+            onSaved={() => {
+              void load();
+            }}
+          />
+        </div>
+
         {!fcc.closeout && (
           <Card className="mb-6 p-6">
             <p className="mb-1 font-display text-lg text-primon-950">Date fumigant placed</p>
@@ -527,7 +622,10 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                   onChange={(e) => setDatePlaced(e.target.value)}
                 />
               </FormRow>
-              <Button onClick={recordDatePlaced} disabled={!datePlaced || saving}>
+              <Button
+                onClick={recordDatePlaced}
+                disabled={!datePlaced || saving || !hasFumigation}
+              >
                 Open 6-day window
               </Button>
             </div>
@@ -809,12 +907,12 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                   onChange={(e) => setAerationCompleted(e.target.value)}
                 />
               </FormRow>
-              <FormRow label="Duration / total hours under gas">
+              <FormRow label="Hours under aeration">
                 <TextInput
                   type="number"
                   value={durationHours}
                   onChange={(e) => setDurationHours(e.target.value)}
-                  placeholder="Auto from aeration times if blank"
+                  placeholder="Usually 48 — auto from aeration times if blank"
                 />
               </FormRow>
             </div>

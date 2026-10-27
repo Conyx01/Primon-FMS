@@ -41,10 +41,11 @@ export default function CertificatePage({ params }: { params: { id: string } }) 
         <div className="flex items-center gap-6">
           <PrimonLogo width={150} />
           <Link
-            href="/dashboard"
+            href={wo && wo.status !== "certified" ? `/dashboard/monitor/${wo.id}` : "/dashboard"}
             className="hidden items-center gap-1.5 text-xs font-medium text-primon-700 hover:text-primon-900 sm:flex"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to platform
+            <ArrowLeft className="h-3.5 w-3.5" />{" "}
+            {wo && wo.status !== "certified" ? "Edit job details" : "Back to platform"}
           </Link>
         </div>
         {wo?.status === "certified" && (() => {

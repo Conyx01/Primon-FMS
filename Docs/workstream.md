@@ -36,7 +36,7 @@ This file combines the planned development roadmap and the reactive work log (fi
 - [x] 3.3 Auto-generate `WO-YYYY-#####` sequentially per year. Accept an externally supplied unique code; set `source` to `client_supplied` | `auto_generated` | `website`.
 - [x] 3.4 Collect and persist optional header metadata on create/edit: Sales Order No., Shipment No., Delivery No. Add `scale` value `household` alongside `industrial` | `smallholder`.
 - [x] 3.5 Wire the dashboard active-work-order table to `GET /api/work-orders` and add search/filter controls. KPI cards from the API.
-- [x] 3.6 Restrict the new-work-order wizard step 0 to work-order identity only. Do not insert `gas_readings` on create. Invite fields hide once an existing client is selected.
+- [x] 3.6 Restrict the new-work-order wizard step 0 to work-order identity only. Do not insert `gas_readings` on create. Invite fields hide once an existing client is selected. Finishing step 0 **creates the WO + FCC draft** so the attached client can see it in `/portal`. Overview **Continue** on a draft resumes `/dashboard/work-orders/new?id=` at SI (if incomplete) or fumigation (if SI complete). If fumigation already exists, Continue opens the monitor.
 
 ### 4.0 Inventory, Formulations & Stock Movements (generated against SDD v1.0)
 > `/dashboard/inventory` already shows on-hand levels. SDD requires Admin-only adjustments, an append-only movement log, and `quantityOnHand` as a maintained aggregate.
@@ -50,8 +50,8 @@ This file combines the planned development roadmap and the reactive work log (fi
 ### 5.0 FCC Draft, Shipping Instructions & Fumigation Description (generated against SDD v1.0)
 - [x] 5.1 Implement `GET /api/fccs/[id]` returning the FCC with SI, description, readings, close-out, and signatures.
 - [x] 5.2 Implement `PATCH /api/fccs/[id]/si`: client (own FCC) and Ops/Admin may edit until locked or certified. Fumigation Contractor pre-filled to Primon Enterprises Limited.
-- [x] 5.3 Scope `/portal` to the authenticated client’s work orders by `clientId`. Portal SI form until certification; sheet read-only after.
-- [x] 5.4 Implement `POST`/`PATCH /api/fccs/[id]/fumigation-description` with transactional stock deduction and insufficient-stock reject. Set FCC `in_progress` when description is complete.
+- [x] 5.3 Scope `/portal` to the authenticated client’s work orders by `clientId`. Portal SI form until certification (consignor/consignee labels; update after first save). Staff see the same SI form on the monitor. Sheet read-only after certify.
+- [x] 5.4 Implement `POST`/`PATCH /api/fccs/[id]/fumigation-description` with transactional stock deduction and insufficient-stock reject. Set FCC `in_progress` when description is complete. Required before Date Fumigant Placed and certify.
 - [x] 5.5 Allow SI to remain incomplete when description is saved. SI completeness must not block fumigation or readings.
 - [x] 5.6 Wire wizard steps 1–2 and portal SI editor to these APIs.
 - [x] 5.7 Show Relative Humidity on the certificate 6-day table.
@@ -62,9 +62,9 @@ This file combines the planned development roadmap and the reactive work log (fi
 - [x] 6.2 `POST /api/readings`: numeric Airspace and Probe/Case; temps and RH optional. Store `status` (`compliant` if both ≥ 600ppm, `critical` if either < 600). Persist `enteredBy` / `enteredAt` from the session.
 - [x] 6.3 Critical: set FCC `flagged`, enqueue Ops/Admin in-app + email (9.3). Keep the day red until a corrective action is logged.
 - [x] 6.4 `POST /api/readings/[id]/corrective-action`: session actor. Set day to `action_taken` (re-dose). That day does not count toward the six successful days. FCC to `under_review` only when six `compliant` days exist and none are pending/critical.
-- [x] 6.5 Close-out form for Aeration Began, Aeration Completed, Duration / Total Hours Under Gas. Not auto-stamped in `certify()`. Save close-out stays visible so aeration can be corrected.
+- [x] 6.5 Close-out form for Aeration Began, Aeration Completed, **Hours under aeration** (usually 48; auto from aeration times if blank). Shown on the certificate after the 6-day table. Not auto-stamped in `certify()`. Save close-out stays visible so aeration can be corrected.
 - [x] 6.6 Wire `/dashboard/monitor` and `/dashboard/monitor/[id]` to the APIs. Sequential next-pending-day UX.
-- [x] 6.7 Block certification until **six `compliant` days** exist, no open critical/pending gas days, **and** close-out is recorded. `action_taken` is documented on the monitor only. `audit_log` for readings and corrective actions.
+- [x] 6.7 Block certification until **six `compliant` days** exist, no open critical/pending gas days, fumigation description exists, **and** close-out is recorded. `action_taken` is documented on the monitor only. `audit_log` for readings and corrective actions.
 
 ### 7.0 Certification, Signatures, QR, PDF & Public Verify (generated against SDD v1.0)
 - [x] 7.1 Certification UI for Supervising Fumigator, For the Supplier, Certifying Officer. Persist `signatures`. System timestamp stands in for wet signature.
@@ -119,3 +119,4 @@ This file combines the planned development roadmap and the reactive work log (fi
 2026-09-25 — Neon adapter fix; Phase 6.0 monitor; Phase 7.0 certify/verify; Phase 8.0 intake (later: no intake API key); 9.1 / 10.1 / 10.3 / 11.0 without Resend operational mail.
 2026-10-09 — Operational Resend: critical, certified, intake, low-stock (post-commit; invite/reset already live). Day 0 ≥ 16°C gate; portal SI editor; client attach locked after first save; wizard invite hidden when client selected. Auth visual: white `Primon-logo.png` on navy, particles, grid, blue border-beam card. Marketing landing purged; `/` → `/login`. Sunday skip confirmed vs paper FCC (not a bug). Household reminder send still parked (10.2 / 10.4). v1 industrial FCC considered complete for ship.
 2026-10-21 — Six successful fumigation days: `action_taken` (re-dose) no longer counts toward certification. Extra gas-reading slot auto-appended only when no pending Day 1+ remains and compliant count is below 6 (Sunday skip). Certificate PDF/preview shows Day 0 + six compliant columns; Ops monitor keeps every day.
+2026-10-27 — Presentation follow-up: WO draft is created after wizard step 0 so the client sees it in the portal. Continue resumes SI or fumigation (not a blank wizard). Fumigation description required for stock deduction, Date Placed, and certify. Staff SI editor on monitor; portal SI update after first save. Close-out/certificate label is hours under aeration (after the 6-day table). Pre-certify “edit” is source fields on the job, not a second document.
