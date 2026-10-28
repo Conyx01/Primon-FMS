@@ -4,6 +4,7 @@ type ApiFcc = {
   id: string;
   certificateNumber: string | null;
   status: FccStatus;
+  remarks: string | null;
   certifiedAt: string | null;
   verificationUrl: string | null;
   workOrder: {
@@ -183,6 +184,7 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
     certificateNumber: fcc.certificateNumber ?? undefined,
     certifiedAt: fcc.certifiedAt ?? undefined,
     verificationUrl: fcc.verificationUrl ?? undefined,
+    remarks: fcc.remarks ?? undefined,
     signatures: fcc.signatures ?? [],
   };
 }

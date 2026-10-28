@@ -189,6 +189,7 @@ model FCC {
   workOrderId       String    @unique
   certificateNumber String?   @unique
   status            FccStatus @default(draft)
+  remarks           String?
   certifiedAt       DateTime?
   certifiedById     String?
   qrCodeUrl         String?

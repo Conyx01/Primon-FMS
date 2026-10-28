@@ -17,9 +17,11 @@ import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
 import { isShippingInstructionsComplete } from "@/lib/si-complete";
 import {
+  REQUIRED_CONSECUTIVE_LETHAL_DAYS,
   REQUIRED_SUCCESSFUL_GAS_DAYS,
   canCertifyGasReadings,
   successfulGasDayCount,
+  evaluateStreak,
 } from "@/lib/successful-days";
 
 type ApiReading = {
@@ -184,6 +186,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const [durationHours, setDurationHours] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [remarks, setRemarks] = useState("");
   const [signers, setSigners] = useState({
     supervising_fumigator: "Prince Chiwalo",
     supplier_rep: "",
@@ -210,6 +213,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
         closeout.durationHours != null ? String(closeout.durationHours) : ""
       );
     }
+    setRemarks(data.fcc.remarks ?? "");
     const existingSignatures = data.fcc.signatures || [];
     const fumSig = existingSignatures.find((s: any) => s.role === "supervising_fumigator")?.signerName;
     const supSig = existingSignatures.find((s: any) => s.role === "supplier_rep")?.signerName;
@@ -278,6 +282,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     mapped16.map((r) => ({ dayNumber: r.day, status: r.status }))
   );
   const allResolved = canCertifyGasReadings(
+    mapped16.map((r) => ({ dayNumber: r.day, status: r.status }))
+  );
+  const streakResult = evaluateStreak(
     mapped16.map((r) => ({ dayNumber: r.day, status: r.status }))
   );
   const hasOpenCritical = mapped16.some((r) => r.status === "critical");
@@ -393,11 +400,21 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       if (!res.ok) throw new Error(data.error || "Failed to save reading");
       await load();
       if (data.extendedReading) {
+        if (data.phase2) {
+          showToast(
+            `Day ${day} saved — 120-hour lethal window already achieved. Day ${data.extendedReading.dayNumber} added to capture a compliant 6th reading.`
+          );
+        } else {
+          showToast(
+            `Day ${day} saved. Monitoring extended to Day ${data.extendedReading.dayNumber} — ${successfulCount + (data.reading.status === "compliant" ? 1 : 0)} of ${REQUIRED_CONSECUTIVE_LETHAL_DAYS} consecutive days so far.`
+          );
+        }
+      } else if (data.reading.status === "critical" && data.phase2) {
         showToast(
-          `Day ${day} saved. Extra monitoring day ${data.extendedReading.dayNumber} added — ${successfulCount + (data.reading.status === "compliant" ? 1 : 0)} of ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful days so far.`
+          `Day ${day} reading below 600 ppm — 120-hour window already met. Day ${data.extendedReading?.dayNumber ?? "next"} added to secure a compliant 6th reading.`
         );
       } else if (data.reading.status === "critical") {
-        showToast(`Day ${day} flagged critical — log a re-dose, then continue. That day does not count toward the six successful days.`);
+        showToast(`Day ${day} below 600 ppm — streak reset to 0. Log re-dose / corrective action, then continue. The next compliant day will restart the 120-hour clock.`);
       } else {
         showToast(`Day ${day} reading saved — compliant.`);
       }
@@ -425,8 +442,8 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       await load();
       showToast(
         data.extendedReading
-          ? `Re-dose logged for Day ${day}. Extra monitoring day ${data.extendedReading.dayNumber} added.`
-          : `Re-dose logged for Day ${day}. That day does not count toward the six successful days.`
+          ? `Re-dose logged for Day ${day}. Streak reset — next compliant day restarts the 120-hour clock. Day ${data.extendedReading.dayNumber} added.`
+          : `Re-dose logged for Day ${day}. Streak reset — the next compliant day restarts the 120-hour lethal clock.`
       );
       setActionDay(null);
       setActionNote("");
@@ -475,6 +492,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             ? new Date(aerationCompleted).toISOString()
             : null,
           durationHours: durationHours ? Number(durationHours) : null,
+          remarks: remarks.trim() || null,
         }),
       });
       const data = await res.json();
@@ -782,8 +800,58 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           <Card>
             <CardHeader
               title="Gas-reading monitor"
-              description={`${successfulCount} of ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful days (≥${LETHAL_THRESHOLD}ppm both probes). Failed days stay on this log; the certificate shows successful days only.`}
+              description={`All monitoring days are shown below. The certificate uses only the 5 consecutive lethal days (≥${LETHAL_THRESHOLD}ppm) plus the compliant 6th day.`}
             />
+
+            {/* ── Streak progress bar ─────────────────────────── */}
+            <div className="mx-6 mb-2 rounded-lg border border-border bg-slate-50 px-4 py-3">
+              {streakResult.lethalWindowMet ? (
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-status-compliant" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-status-compliant">
+                      120-hour lethal window achieved
+                    </p>
+                    <p className="text-[11px] text-muted">
+                      {streakResult.sixthDayCompliant
+                        ? "6th compliant day recorded — ready for certification."
+                        : "Awaiting a compliant 6th day (144 hrs) to complete the cycle."}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-status-compliantTint px-2 py-0.5 text-[11px] font-semibold text-status-compliant">
+                    {REQUIRED_CONSECUTIVE_LETHAL_DAYS}/{REQUIRED_CONSECUTIVE_LETHAL_DAYS}
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-ink">
+                      Consecutive lethal-exposure streak
+                    </p>
+                    <span className="text-[11px] font-semibold text-ink">
+                      {streakResult.currentStreak}/{REQUIRED_CONSECUTIVE_LETHAL_DAYS} days
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-primon-500 transition-all"
+                      style={{ width: `${(streakResult.currentStreak / REQUIRED_CONSECUTIVE_LETHAL_DAYS) * 100}%` }}
+                    />
+                  </div>
+                  {streakResult.currentStreak === 0 && mapped16.some(r => r.status !== "pending") && (
+                    <p className="mt-1 text-[11px] text-status-critical">
+                      Streak reset — next compliant (≥600 ppm) reading starts a new 120-hour clock.
+                    </p>
+                  )}
+                  {streakResult.currentStreak > 0 && (
+                    <p className="mt-1 text-[11px] text-muted">
+                      {REQUIRED_CONSECUTIVE_LETHAL_DAYS - streakResult.currentStreak} more consecutive day{REQUIRED_CONSECUTIVE_LETHAL_DAYS - streakResult.currentStreak !== 1 ? "s" : ""} at ≥600 ppm required to complete the 120-hour window.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {!day0Ready && (
               <p className="px-6 text-xs text-amber-700">
                 {day0Reading?.productTemp != null &&
@@ -938,6 +1006,19 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 />
               </FormRow>
             </div>
+            <div className="mt-5">
+              <FormRow label="Remarks / Compliance Notes (optional)">
+                <textarea
+                  className="h-24 w-full rounded-lg border border-border p-3 text-sm outline-none focus:border-primon-500"
+                  placeholder="e.g. Day 2 dropped below 600 ppm — streak reset; Day 3 became Effective Day 1. Extended monitoring completed 120-hr lethal exposure plus compliant 6th day."
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                />
+                <p className="mt-1 text-[11px] text-muted">
+                  These remarks will appear in the compliance remarks section on the final Fumigation Completion Certificate.
+                </p>
+              </FormRow>
+            </div>
             <div className="mt-5 flex justify-end">
               <Button onClick={saveCloseout} disabled={saving}>
                 Save close-out
@@ -1022,8 +1103,8 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 {fcc.status === "certified"
                   ? "This FCC is locked. Scan the QR on the certificate to open the public summary."
                   : canCertify
-                    ? `${REQUIRED_SUCCESSFUL_GAS_DAYS} successful gas-reading days and close-out recorded. Enter the three signers, then certify.`
-                    : `Record ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful (≥${LETHAL_THRESHOLD}ppm) days, resolve any critical flags, and save aeration close-out before certifying.`}
+                    ? "5 consecutive lethal days (120 hrs) + 6th compliant day and close-out recorded. Enter the three signers, then certify."
+                    : `Achieve 5 consecutive lethal days (≥${LETHAL_THRESHOLD}ppm), a compliant 6th day, and save aeration close-out before certifying.`}
               </p>
             </div>
           </div>

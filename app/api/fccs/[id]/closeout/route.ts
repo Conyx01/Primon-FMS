@@ -53,6 +53,14 @@ export async function PATCH(
         (aerationCompleted.getTime() - aerationBegan.getTime()) / (1000 * 60 * 60);
     }
 
+    // Remarks — optional operational note (free text, trimmed)
+    const remarks =
+      body.remarks === undefined
+        ? undefined // not in this request — keep existing value
+        : body.remarks === null || body.remarks === ""
+          ? null
+          : String(body.remarks).trim();
+
     const closeout = await prisma.$transaction(async (tx) => {
       const updated = await tx.fumigationCloseout.update({
         where: { id: fcc.closeout!.id },
@@ -62,6 +70,14 @@ export async function PATCH(
           durationHours,
         },
       });
+
+      // Remarks live on the FCC itself
+      if (remarks !== undefined) {
+        await tx.fCC.update({
+          where: { id: fcc.id },
+          data: { remarks },
+        });
+      }
 
       await tx.auditLog.create({
         data: {
@@ -73,6 +89,7 @@ export async function PATCH(
             aerationBegan: aerationBegan?.toISOString() ?? null,
             aerationCompleted: aerationCompleted?.toISOString() ?? null,
             durationHours,
+            ...(remarks !== undefined ? { remarks } : {}),
           },
         },
       });
@@ -80,7 +97,13 @@ export async function PATCH(
       return updated;
     });
 
-    return NextResponse.json({ closeout }, { status: 200 });
+    // Fetch updated remarks to return
+    const updatedFcc = await prisma.fCC.findUnique({
+      where: { id: fcc.id },
+      select: { remarks: true },
+    });
+
+    return NextResponse.json({ closeout, remarks: updatedFcc?.remarks ?? null }, { status: 200 });
   } catch (error: unknown) {
     console.error("PATCH /api/fccs/[id]/closeout error:", error);
     return NextResponse.json({ error: "Failed to save close-out" }, { status: 500 });

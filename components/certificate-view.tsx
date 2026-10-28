@@ -96,6 +96,8 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
   const byDay = new Map<number, GasReading>();
   const day0 = wo.readings.find((r) => r.day === 0);
   if (day0) byDay.set(0, day0);
+  // certificateSuccessfulReadings returns the 5 streak days + the 6th compliant day,
+  // in calendar order — mapped to columns 1–6 on the certificate.
   certificateSuccessfulReadings(wo.readings).forEach((r, i) => {
     byDay.set(i + 1, r);
   });
@@ -389,6 +391,16 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
             className="col-span-3"
           />
         </div>
+
+        {/* Remarks — only rendered when text is present */}
+        {wo.remarks && (
+          <div className="mt-1.5 border border-gray-300 px-2 py-1 text-[9px]">
+            <span className="block text-[8px] font-semibold uppercase tracking-wide text-gray-500">
+              Remarks
+            </span>
+            <p className="mt-0.5 leading-[1.5] text-gray-800 whitespace-pre-wrap">{wo.remarks}</p>
+          </div>
+        )}
       </section>
 
       {/* ── SECTION 5: CERTIFICATION ── */}

@@ -82,6 +82,7 @@ export interface WorkOrder {
   certificateNumber?: string;
   certifiedAt?: string;
   verificationUrl?: string;
+  remarks?: string;
   signatures?: {
     role: string;
     signerName: string;

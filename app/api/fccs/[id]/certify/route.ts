@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, NotificationChannel, Role, SignatureRole } from "@prisma/client";
 import { verificationUrl } from "@/lib/verify-url";
 import { emailFccCertified } from "@/lib/notify-email";
-import { canCertifyGasReadings, REQUIRED_SUCCESSFUL_GAS_DAYS } from "@/lib/successful-days";
+import { canCertifyGasReadings, REQUIRED_CONSECUTIVE_LETHAL_DAYS } from "@/lib/successful-days";
 
 const REQUIRED_ROLES: SignatureRole[] = [
   SignatureRole.supervising_fumigator,
@@ -103,7 +103,7 @@ export async function POST(
     if (!canCertifyGasReadings(readings)) {
       return NextResponse.json(
         {
-          error: `Certification requires ${REQUIRED_SUCCESSFUL_GAS_DAYS} successful (≥600ppm) gas-reading days with no open critical or pending days`,
+          error: `Certification requires ${REQUIRED_CONSECUTIVE_LETHAL_DAYS} consecutive compliant days (≥600 ppm) followed by a compliant 6th day, with no open critical or pending readings`,
         },
         { status: 409 }
       );
