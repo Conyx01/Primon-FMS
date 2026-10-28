@@ -21,12 +21,11 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           <PrimonLogo variant="onDark" width={384} className="h-auto w-full" />
         </div>
         <div className="relative z-10 max-w-sm">
-          <p className="font-display text-[26px] leading-snug text-white">
-            &ldquo;The gas has to reach a lethal dose above 600, consistently, for six
-            days. That&apos;s what makes a fumigation successful.&rdquo;
-          </p>
-          <p className="mt-4 text-sm text-primon-300">
-            — Operations standard, Primon Enterprises
+          <h1 className="font-display text-[26px] font-semibold leading-snug text-white">
+            Welcome to Primon Fumigation Management System
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-primon-300">
+            Enterprise pest control and phytosanitary compliance management.
           </p>
         </div>
         <p className="relative z-10 text-xs text-primon-400">
