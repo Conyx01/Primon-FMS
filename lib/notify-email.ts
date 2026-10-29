@@ -56,6 +56,29 @@ async function sendToEach(
   }
 }
 
+export async function emailFumigationCommenced(args: {
+  workOrderCode: string;
+  clientId: string;
+  datePlaced: string;
+}) {
+  const users = await findActiveUsers({
+    extraIds: [args.clientId],
+  });
+  const origin = getPublicOrigin();
+  const ctaUrl = `${origin}/portal`;
+  await sendToEach(users, () => ({
+    subject: `Fumigation commenced — ${args.workOrderCode}`,
+    heading: "Fumigation cycle commenced",
+    body: [
+      `Fumigant has been placed on your shipment under ${args.workOrderCode}.`,
+      "The 6-day active gas monitoring cycle is now underway.",
+      "You can track daily gas readings and commodity status live via your Primon Client Portal.",
+    ].join("\n"),
+    ctaLabel: "Open client portal",
+    ctaUrl,
+  }));
+}
+
 export async function emailCriticalReading(args: {
   workOrderId: string;
   workOrderCode: string;

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { ReadingStatus } from "@prisma/client";
 import { buildReadingDates } from "@/lib/readings";
+import { emailFumigationCommenced } from "@/lib/notify-email";
 
 export async function POST(
   req: NextRequest,
@@ -30,7 +31,7 @@ export async function POST(
       where: {
         OR: [{ id }, { workOrderId: id }, { workOrder: { code: id } }],
       },
-      include: { closeout: true, gasReadings: true, fumigationDescription: true },
+      include: { closeout: true, gasReadings: true, fumigationDescription: true, workOrder: { select: { code: true, clientId: true } } },
     });
 
     if (!fcc) {
@@ -105,6 +106,14 @@ export async function POST(
 
       return { closeout, day0, readings };
     });
+
+    if (fcc.workOrder?.clientId) {
+      emailFumigationCommenced({
+        workOrderCode: fcc.workOrder.code,
+        clientId: fcc.workOrder.clientId,
+        datePlaced: datePlaced.toISOString(),
+      }).catch((err) => console.error("emailFumigationCommenced error:", err));
+    }
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {

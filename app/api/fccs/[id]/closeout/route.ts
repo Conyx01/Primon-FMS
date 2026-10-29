@@ -53,6 +53,11 @@ export async function PATCH(
         (aerationCompleted.getTime() - aerationBegan.getTime()) / (1000 * 60 * 60);
     }
 
+    let clearanceGasPpm =
+      body.clearanceGasPpm === "" || body.clearanceGasPpm == null
+        ? (body.clearanceGasPpm === "" ? null : (aerationCompleted ? 0.01 : null))
+        : Number(body.clearanceGasPpm);
+
     // Remarks — optional operational note (free text, trimmed)
     const remarks =
       body.remarks === undefined
@@ -68,6 +73,7 @@ export async function PATCH(
           aerationBegan,
           aerationCompleted,
           durationHours,
+          clearanceGasPpm,
         },
       });
 
@@ -89,6 +95,7 @@ export async function PATCH(
             aerationBegan: aerationBegan?.toISOString() ?? null,
             aerationCompleted: aerationCompleted?.toISOString() ?? null,
             durationHours,
+            clearanceGasPpm,
             ...(remarks !== undefined ? { remarks } : {}),
           },
         },

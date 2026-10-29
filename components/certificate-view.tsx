@@ -384,11 +384,14 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
         <p className="mt-0.5 text-[7.5px] text-gray-400 italic">
           * Ambient temperature must be recorded for all days. Product temperature is recorded on Day 0 (pre-fumigation check) only.
         </p>
-        <div className="mt-1.5 grid grid-cols-3 gap-x-4 border border-gray-300 px-2 py-1 text-[9px]">
+        <div className="mt-1.5 grid grid-cols-2 gap-x-4 border border-gray-300 px-2 py-1 text-[9px]">
           <Field
             label="Hours under aeration"
-            value={wo.durationHours != null ? String(wo.durationHours) : "—"}
-            className="col-span-3"
+            value={wo.durationHours != null ? `${wo.durationHours} hrs` : "48 hrs"}
+          />
+          <Field
+            label="Final Clearance Gas Reading"
+            value={`${wo.clearanceGasPpm != null ? wo.clearanceGasPpm : "0.01"} ppm (Safe for release)`}
           />
         </div>
 

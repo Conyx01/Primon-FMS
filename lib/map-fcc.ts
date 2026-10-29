@@ -68,6 +68,7 @@ type ApiFcc = {
     aerationBegan: string | null;
     aerationCompleted: string | null;
     durationHours: number | null;
+    clearanceGasPpm?: number | null;
   } | null;
   signatures?: {
     role: string;
@@ -181,6 +182,7 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
     aerationBegan: fcc.closeout?.aerationBegan ?? undefined,
     aerationCompleted: fcc.closeout?.aerationCompleted ?? undefined,
     durationHours: fcc.closeout?.durationHours ?? undefined,
+    clearanceGasPpm: fcc.closeout?.clearanceGasPpm ?? undefined,
     certificateNumber: fcc.certificateNumber ?? undefined,
     certifiedAt: fcc.certifiedAt ?? undefined,
     verificationUrl: fcc.verificationUrl ?? undefined,

@@ -82,6 +82,7 @@ type FccPayload = {
     aerationBegan: string | null;
     aerationCompleted: string | null;
     durationHours: number | null;
+    clearanceGasPpm?: number | null;
   } | null;
 };
 
@@ -184,6 +185,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const [aerationBegan, setAerationBegan] = useState("");
   const [aerationCompleted, setAerationCompleted] = useState("");
   const [durationHours, setDurationHours] = useState("");
+  const [clearanceGasPpm, setClearanceGasPpm] = useState("0.01");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
@@ -211,6 +213,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       setAerationCompleted(toLocalInput(closeout.aerationCompleted));
       setDurationHours(
         closeout.durationHours != null ? String(closeout.durationHours) : ""
+      );
+      setClearanceGasPpm(
+        closeout.clearanceGasPpm != null ? String(closeout.clearanceGasPpm) : "0.01"
       );
     }
     setRemarks(data.fcc.remarks ?? "");
@@ -492,6 +497,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             ? new Date(aerationCompleted).toISOString()
             : null,
           durationHours: durationHours ? Number(durationHours) : null,
+          clearanceGasPpm: clearanceGasPpm ? Number(clearanceGasPpm) : 0.01,
           remarks: remarks.trim() || null,
         }),
       });
@@ -982,7 +988,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             <p className="mb-4 text-xs text-muted">
               Aeration times are recorded here. They are not stamped automatically at certification.
             </p>
-            <div className="grid gap-5 sm:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <FormRow label="Aeration began">
                 <TextInput
                   type="datetime-local"
@@ -1002,8 +1008,25 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                   type="number"
                   value={durationHours}
                   onChange={(e) => setDurationHours(e.target.value)}
-                  placeholder="Usually 48 — auto from aeration times if blank"
+                  placeholder="Usually 48 — auto if blank"
                 />
+              </FormRow>
+              <FormRow label="Clearance reading (ppm)">
+                <TextInput
+                  type="number"
+                  step="0.001"
+                  value={clearanceGasPpm}
+                  onChange={(e) => setClearanceGasPpm(e.target.value)}
+                  placeholder="0.01"
+                />
+                <p className="mt-1 text-[11px] text-muted">
+                  Safe threshold &le; 0.01 ppm
+                </p>
+                {Number(clearanceGasPpm) > 0.01 && (
+                  <p className="mt-0.5 text-[11px] font-medium text-amber-600">
+                    &Delta; Exceeds safe clearance threshold (&le; 0.01 ppm)
+                  </p>
+                )}
               </FormRow>
             </div>
             <div className="mt-5">

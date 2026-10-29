@@ -79,6 +79,7 @@ export interface WorkOrder {
   aerationBegan?: string;
   aerationCompleted?: string;
   durationHours?: number;
+  clearanceGasPpm?: number;
   certificateNumber?: string;
   certifiedAt?: string;
   verificationUrl?: string;

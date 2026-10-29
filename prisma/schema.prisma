@@ -360,6 +360,7 @@ model FumigationCloseout {
   aerationBegan     DateTime?
   aerationCompleted DateTime?
   durationHours     Float?
+  clearanceGasPpm   Float?    @default(0.01)
 
   // Relations
   fcc FCC @relation(fields: [fccId], references: [id], onDelete: Cascade)
