@@ -9,7 +9,7 @@ export type FccStatus =
   | "flagged"
   | "certified";
 
-export type DayStatus = "pending" | "compliant" | "critical" | "action_taken";
+export type DayStatus = "pending" | "compliant" | "critical" | "action_taken" | "not_monitored";
 
 export interface ShippingInstructions {
   tobaccoSupplier: string;
@@ -52,6 +52,7 @@ export interface GasReading {
   productTemp: number | null;
   humidity: number | null;
   status: DayStatus;
+  nonMonitoringReason?: string | null;
   correctiveAction?: {
     note: string;
     loggedBy: string;

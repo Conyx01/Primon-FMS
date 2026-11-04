@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/ui/kpi";
 import { ShippingInstructionsForm } from "@/components/shipping-instructions-form";
 import { GasReading, FccStatus, ShippingInstructions } from "@/lib/types";
 import { LETHAL_THRESHOLD, PRODUCT_TEMP_MINIMUM_C } from "@/lib/status";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import { isShippingInstructionsComplete } from "@/lib/si-complete";
 import {
   REQUIRED_CONSECUTIVE_LETHAL_DAYS,
@@ -178,6 +178,8 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     productTemp: "",
     humidity: "",
   });
+  const [isNonMonitoring, setIsNonMonitoring] = useState(false);
+  const [nonMonitoringReason, setNonMonitoringReason] = useState("Saturday - Weekend warehouse closure");
   const [day0Form, setDay0Form] = useState({ ambientTemp: "", productTemp: "" });
   const [actionDay, setActionDay] = useState<number | null>(null);
   const [actionNote, setActionNote] = useState("");
@@ -389,22 +391,32 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     if (!row) return;
     setSaving(true);
     try {
+      const payload = isNonMonitoring
+        ? {
+            readingId: row.id,
+            status: "not_monitored",
+            nonMonitoringReason: nonMonitoringReason.trim(),
+          }
+        : {
+            readingId: row.id,
+            airspacePpm: Number(form.airspace),
+            probeCasePpm: Number(form.probeCase),
+            ambientTempC: form.ambientTemp || null,
+            productTempC: form.productTemp || null,
+            relativeHumidityPct: form.humidity || null,
+          };
+
       const res = await fetch("/api/readings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          readingId: row.id,
-          airspacePpm: Number(form.airspace),
-          probeCasePpm: Number(form.probeCase),
-          ambientTempC: form.ambientTemp || null,
-          productTempC: form.productTemp || null,
-          relativeHumidityPct: form.humidity || null,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save reading");
       await load();
-      if (data.extendedReading) {
+      if (isNonMonitoring) {
+        showToast(`Day ${day} marked as ${nonMonitoringReason.split(" - ")[0]} (closed) — continuous exposure maintained under seal.`);
+      } else if (data.extendedReading) {
         if (data.phase2) {
           showToast(
             `Day ${day} saved — 120-hour lethal window already achieved. Day ${data.extendedReading.dayNumber} added to capture a compliant 6th reading.`
@@ -875,9 +887,37 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                       size="sm"
                       variant="secondary"
                       className="w-full"
-                      onClick={() => setLogging(r.day)}
+                      onClick={() => {
+                        const rowDate = r.date ? new Date(r.date) : null;
+                        const isWeekend = rowDate ? (rowDate.getUTCDay() === 0 || rowDate.getUTCDay() === 6) : false;
+                        if (isWeekend) {
+                          setIsNonMonitoring(true);
+                          setNonMonitoringReason(
+                            rowDate?.getUTCDay() === 6
+                              ? "Saturday - Weekend warehouse closure"
+                              : "Sunday - Weekend warehouse closure"
+                          );
+                        } else {
+                          setIsNonMonitoring(false);
+                        }
+                        setLogging(r.day);
+                      }}
                     >
                       Log reading
+                    </Button>
+                  )}
+                  {canLogGasReading && r.status === "not_monitored" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs text-amber-900 border border-amber-300 bg-amber-50/50 hover:bg-amber-100"
+                      onClick={() => {
+                        setIsNonMonitoring(true);
+                        setNonMonitoringReason(r.nonMonitoringReason || "Saturday - Weekend warehouse closure");
+                        setLogging(r.day);
+                      }}
+                    >
+                      Edit closure / reading
                     </Button>
                   )}
                   {r.status === "critical" && (
@@ -898,56 +938,152 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
 
         {logging !== null && (
           <Card className="mt-6 p-6">
-            <p className="mb-4 font-display text-lg text-primon-950">Log Day {logging} reading</p>
-            <div className="grid gap-5 sm:grid-cols-5">
-              <FormRow label="Airspace (ppm)" required>
-                <TextInput
-                  type="number"
-                  autoFocus
-                  value={form.airspace}
-                  onChange={(e) => setForm({ ...form, airspace: e.target.value })}
-                />
-              </FormRow>
-              <FormRow label="Probe/Case (ppm)" required>
-                <TextInput
-                  type="number"
-                  value={form.probeCase}
-                  onChange={(e) => setForm({ ...form, probeCase: e.target.value })}
-                />
-              </FormRow>
-              <FormRow label="Ambient temp (°C)">
-                <TextInput
-                  type="number"
-                  value={form.ambientTemp}
-                  onChange={(e) => setForm({ ...form, ambientTemp: e.target.value })}
-                />
-              </FormRow>
-              <FormRow label="Product temp (°C)">
-                <TextInput
-                  type="number"
-                  value={form.productTemp}
-                  onChange={(e) => setForm({ ...form, productTemp: e.target.value })}
-                />
-              </FormRow>
-              <FormRow label="Relative humidity (%)">
-                <TextInput
-                  type="number"
-                  value={form.humidity}
-                  onChange={(e) => setForm({ ...form, humidity: e.target.value })}
-                />
-              </FormRow>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <p className="font-display text-lg text-primon-950">Day {logging} Entry</p>
+                <p className="text-xs text-muted">
+                  Record gas concentration levels or mark as a facility closure day (e.g. weekend/holiday).
+                </p>
+              </div>
+              <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setIsNonMonitoring(false)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 transition-all",
+                    !isNonMonitoring
+                      ? "bg-white text-primon-900 shadow-sm"
+                      : "text-muted hover:text-ink"
+                  )}
+                >
+                  Gas Reading (ppm)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsNonMonitoring(true)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 transition-all",
+                    isNonMonitoring
+                      ? "bg-amber-100 text-amber-900 shadow-sm font-semibold"
+                      : "text-muted hover:text-ink"
+                  )}
+                >
+                  Non-Monitoring (Closed / Weekend)
+                </button>
+              </div>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setLogging(null)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => submitReading(logging)}
-                disabled={!form.airspace || !form.probeCase || saving}
-              >
-                Save reading
-              </Button>
-            </div>
+
+            {isNonMonitoring ? (
+              <div className="space-y-4 py-2">
+                <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+                  <p className="text-sm font-semibold text-amber-900">
+                    Non-Monitoring / Facility Closure Day
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800/80">
+                    Use this when client operations are halted (e.g. Nyasa Tobacco closed on Saturday/Sunday). The fumigant remains sealed and active, and this day bridges the exposure window without breaking the streak.
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Select reason for no reading</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[
+                      "Saturday - Weekend warehouse closure",
+                      "Sunday - Weekend warehouse closure",
+                      "Public Holiday / Facility closed",
+                      "Client warehouse closed",
+                    ].map((reasonOption) => (
+                      <button
+                        key={reasonOption}
+                        type="button"
+                        onClick={() => setNonMonitoringReason(reasonOption)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-xs transition-colors",
+                          nonMonitoringReason === reasonOption
+                            ? "border-amber-500 bg-amber-100 font-medium text-amber-900 ring-1 ring-amber-500"
+                            : "border-border bg-white text-ink hover:bg-slate-50"
+                        )}
+                      >
+                        {reasonOption.split(" - ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <FormRow label="Specific note / reason">
+                  <TextInput
+                    value={nonMonitoringReason}
+                    onChange={(e) => setNonMonitoringReason(e.target.value)}
+                    placeholder="e.g. Saturday - Weekend warehouse closure"
+                  />
+                </FormRow>
+
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setLogging(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => submitReading(logging)}
+                    disabled={!nonMonitoringReason.trim() || saving}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    Save Non-Monitoring Day
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="grid gap-5 sm:grid-cols-5">
+                  <FormRow label="Airspace (ppm)" required>
+                    <TextInput
+                      type="number"
+                      autoFocus
+                      value={form.airspace}
+                      onChange={(e) => setForm({ ...form, airspace: e.target.value })}
+                    />
+                  </FormRow>
+                  <FormRow label="Probe/Case (ppm)" required>
+                    <TextInput
+                      type="number"
+                      value={form.probeCase}
+                      onChange={(e) => setForm({ ...form, probeCase: e.target.value })}
+                    />
+                  </FormRow>
+                  <FormRow label="Ambient temp (°C)">
+                    <TextInput
+                      type="number"
+                      value={form.ambientTemp}
+                      onChange={(e) => setForm({ ...form, ambientTemp: e.target.value })}
+                    />
+                  </FormRow>
+                  <FormRow label="Product temp (°C)">
+                    <TextInput
+                      type="number"
+                      value={form.productTemp}
+                      onChange={(e) => setForm({ ...form, productTemp: e.target.value })}
+                    />
+                  </FormRow>
+                  <FormRow label="Relative humidity (%)">
+                    <TextInput
+                      type="number"
+                      value={form.humidity}
+                      onChange={(e) => setForm({ ...form, humidity: e.target.value })}
+                    />
+                  </FormRow>
+                </div>
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setLogging(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => submitReading(logging)}
+                    disabled={!form.airspace || !form.probeCase || saving}
+                  >
+                    Save reading
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
 

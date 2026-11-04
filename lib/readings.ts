@@ -79,18 +79,16 @@ export function addCalendarDays(start: Date, days: number): Date {
 
 /**
  * Starting from `start`, advance one calendar day at a time and collect
- * `count` dates, skipping any date that falls on a Sunday (getUTCDay() === 0).
- * Public holidays are handled manually by Ops.
+ * `count` dates (Day 1 = +24 hrs, Day 2 = +48 hrs, etc.).
+ * Weekend non-monitoring days (Saturday / Sunday) are flagged at the reading level.
  */
 export function buildReadingDates(start: Date, count: number): Date[] {
   const dates: Date[] = [];
   let current = new Date(start);
-  while (dates.length < count) {
+  for (let i = 0; i < count; i++) {
     current = new Date(current);
     current.setUTCDate(current.getUTCDate() + 1);
-    if (current.getUTCDay() !== 0) {
-      dates.push(new Date(current));
-    }
+    dates.push(new Date(current));
   }
   return dates;
 }
@@ -102,8 +100,8 @@ export function buildReadingDates(start: Date, count: number): Date[] {
  *  - No slot is added while any pending slot exists (wait for it to be filled).
  *  - No slot is added once certification criteria are met.
  *  - In Phase 1: an extension is needed if the streak was broken AND we have
- *    no more pending slots.  The next slot continues the calendar sequence so
- *    the fumigator can restart their 5-day count.
+ *    no more pending slots. The next slot continues the calendar sequence so
+ *    the fumigator can restart their exposure count.
  *  - In Phase 2: an extension is needed when the 120h window is met but no
  *    compliant 6th day exists yet (a sub-600 6th day was recorded → we need
  *    another chance).

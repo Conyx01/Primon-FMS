@@ -103,7 +103,7 @@ export async function POST(
     if (!canCertifyGasReadings(readings)) {
       return NextResponse.json(
         {
-          error: `Certification requires ${REQUIRED_CONSECUTIVE_LETHAL_DAYS} consecutive compliant days (≥600 ppm) followed by a compliant 6th day, with no open critical or pending readings`,
+          error: "Certification requires compliant readings across all scheduled exposure days (minimum 4 compliant days for weekend/closure cycles), with no open critical or pending readings",
         },
         { status: 409 }
       );

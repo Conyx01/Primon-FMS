@@ -73,6 +73,13 @@ export const dayStatusMeta: Record<
     border: "border-status-action/40",
     bar: "bg-status-action",
   },
+  not_monitored: {
+    label: "Closed / Weekend",
+    text: "text-amber-800",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    bar: "bg-amber-300",
+  },
 };
 
 export const LETHAL_THRESHOLD = 600;

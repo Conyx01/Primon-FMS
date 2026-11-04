@@ -98,8 +98,9 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
   if (day0) byDay.set(0, day0);
   // certificateSuccessfulReadings returns the 5 streak days + the 6th compliant day,
   // in calendar order — mapped to columns 1–6 on the certificate.
+  const hasNonMon = wo.readings.some((r) => r.status === "not_monitored");
   certificateSuccessfulReadings(wo.readings).forEach((r, i) => {
-    byDay.set(i + 1, r);
+    byDay.set(hasNonMon ? r.day : (i + 1), r);
   });
 
   // Formulation flags
@@ -122,7 +123,16 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
 
   const certDate = wo.certifiedAt ? fmt(wo.certifiedAt) : "—";
 
-  // Primon address (hardcoded — always the contractor; shown in Section 1)
+  function nonMonLabel(r?: GasReading): string {
+  if (!r?.nonMonitoringReason) return "CLOSED";
+  const upper = r.nonMonitoringReason.toUpperCase();
+  if (upper.includes("SAT")) return "SAT (Closed)";
+  if (upper.includes("SUN")) return "SUN (Closed)";
+  if (upper.includes("HOLIDAY")) return "HOLIDAY";
+  return r.nonMonitoringReason.split(" - ")[0] || "CLOSED";
+}
+
+// Primon address (hardcoded — always the contractor; shown in Section 1)
   const PRIMON_ADDRESS =
     "PLOT 13/51, AFRICANA BUILDING, CAPITAL CITY,\nP.O BOX 31633, LILONGWE, MALAWI.";
 
@@ -348,24 +358,28 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               <ReadingRow
                 label="Airspace (ppm)"
                 byDay={byDay}
-                getValue={(r, day) =>
-                  day === 0 ? "N/A" : val(r?.airspace)
-                }
+                getValue={(r, day) => {
+                  if (day === 0) return "N/A";
+                  if (r?.status === "not_monitored") return nonMonLabel(r);
+                  return val(r?.airspace);
+                }}
               />
               {/* Probe/Case ppm */}
               <ReadingRow
                 label="Case/Base Probe (ppm)"
                 byDay={byDay}
-                getValue={(r, day) =>
-                  day === 0 ? "N/A" : val(r?.probeCase)
-                }
+                getValue={(r, day) => {
+                  if (day === 0) return "N/A";
+                  if (r?.status === "not_monitored") return "—";
+                  return val(r?.probeCase);
+                }}
               />
               {/* Ambient temp — all days */}
               <ReadingRow
                 label="Ambient Temp (°C)"
                 byDay={byDay}
-                getValue={(r) => val(r?.ambientTemp)}
-                highlight={(r) => r?.ambientTemp == null}
+                getValue={(r) => (r?.status === "not_monitored" ? "—" : val(r?.ambientTemp))}
+                highlight={(r, day) => day > 0 && r?.status !== "not_monitored" && r?.ambientTemp == null}
               />
               {/* Product temp — Day 0 only, then N/A */}
               <ReadingRow

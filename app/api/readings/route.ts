@@ -17,8 +17,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { readingId, airspacePpm, probeCasePpm, ambientTempC, productTempC, relativeHumidityPct } =
-      body;
+    const {
+      readingId,
+      status: requestedStatus,
+      nonMonitoringReason,
+      airspacePpm,
+      probeCasePpm,
+      ambientTempC,
+      productTempC,
+      relativeHumidityPct,
+    } = body;
 
     if (!readingId) {
       return NextResponse.json({ error: "readingId is required" }, { status: 400 });
@@ -105,13 +113,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reading, fcc: existing.fcc }, { status: 200 });
     }
 
-    // ── Days 1+: full gas reading with ppm ────────────────────────────────────
+    // ── Days 1+: full gas reading or non-monitoring day declaration ──────────
     const day0 = siblingReadings.find((r) => r.dayNumber === 0) ?? null;
     const day0Block = day0BlocksGasReadings(day0);
     if (day0Block) {
       return NextResponse.json({ error: day0Block }, { status: 409 });
     }
 
+    const isNonMonitoring =
+      requestedStatus === "not_monitored" ||
+      requestedStatus === ReadingStatus.not_monitored;
+
+    // ── Non-monitoring day (e.g. Saturday / Sunday weekend closure) ──────────
+    if (isNonMonitoring) {
+      const reason = (nonMonitoringReason || "Weekend closure / Facility closed").trim();
+
+      const result = await prisma.$transaction(async (tx) => {
+        const reading = await tx.gasReading.update({
+          where: { id: readingId },
+          data: {
+            airspacePpm: null,
+            probeCasePpm: null,
+            ambientTempC: null,
+            productTempC: null,
+            relativeHumidityPct: null,
+            status: ReadingStatus.not_monitored,
+            nonMonitoringReason: reason,
+            enteredById: session.dbUser.id,
+            enteredAt: new Date(),
+          },
+          include: {
+            enteredBy: { select: { id: true, name: true, email: true } },
+            correctiveAction: true,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            entityType: "GasReading",
+            entityId: reading.id,
+            action: "record_non_monitoring_day",
+            actorId: session.dbUser.id,
+            diff: {
+              dayNumber: reading.dayNumber,
+              status: ReadingStatus.not_monitored,
+              reason,
+            },
+          },
+        });
+
+        const extendedReading = await createExtensionSlotIfNeeded(tx, {
+          fccId: existing.fccId,
+          actorId: session.dbUser.id,
+        });
+
+        return { reading, fcc: existing.fcc, extendedReading, phase2: false };
+      });
+
+      return NextResponse.json(result, { status: 200 });
+    }
+
+    // ── Monitored gas reading with numeric PPM ───────────────────────────────
     const airspace = Number(airspacePpm);
     const probe = Number(probeCasePpm);
     if (!Number.isFinite(airspace) || !Number.isFinite(probe)) {
@@ -147,6 +209,7 @@ export async function POST(req: NextRequest) {
               ? null
               : Number(relativeHumidityPct),
           status,
+          nonMonitoringReason: null,
           enteredById: session.dbUser.id,
           enteredAt: new Date(),
         },

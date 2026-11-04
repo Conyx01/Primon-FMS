@@ -59,6 +59,7 @@ enum ReadingStatus {
   compliant
   critical
   action_taken
+  not_monitored
 }
 
 enum SignatureRole {
@@ -327,6 +328,7 @@ model GasReading {
   productTempC        Float?
   relativeHumidityPct Float?
   status              ReadingStatus @default(compliant)
+  nonMonitoringReason String?
   enteredById         String
   enteredAt           DateTime      @default(now())
 

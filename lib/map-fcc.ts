@@ -57,6 +57,7 @@ type ApiFcc = {
     productTempC: number | null;
     relativeHumidityPct: number | null;
     status: GasReading["status"];
+    nonMonitoringReason?: string | null;
     correctiveAction?: {
       description: string;
       actionTakenAt: string;
@@ -170,6 +171,7 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
       productTemp: r.productTempC,
       humidity: r.relativeHumidityPct,
       status: r.status,
+      nonMonitoringReason: (r as any).nonMonitoringReason ?? undefined,
       correctiveAction: r.correctiveAction
         ? {
             note: r.correctiveAction.description,

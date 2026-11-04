@@ -3,6 +3,7 @@
 import { GasReading } from "@/lib/types";
 import { dayStatusMeta, LETHAL_THRESHOLD } from "@/lib/status";
 import { cn } from "@/lib/utils";
+import { CalendarX } from "lucide-react";
 
 const SCALE_MAX = 1100;
 
@@ -43,6 +44,7 @@ function Bar({
 
 export function GasDayGauge({ reading }: { reading: GasReading }) {
   const meta = dayStatusMeta[reading.status];
+  const isNotMonitored = reading.status === "not_monitored";
 
   return (
     <div
@@ -64,15 +66,35 @@ export function GasDayGauge({ reading }: { reading: GasReading }) {
         </span>
       </div>
 
-      <div className="flex justify-center gap-5 border-b border-border pb-3">
-        <Bar value={reading.airspace} label="Airspace" color={meta.bar} />
-        <Bar value={reading.probeCase} label="Probe" color={meta.bar} />
-      </div>
+      {isNotMonitored ? (
+        <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-amber-200 bg-amber-50/70 p-2 text-center">
+          <CalendarX className="mb-1.5 h-6 w-6 text-amber-600" />
+          <span className="font-display text-sm font-semibold text-amber-900">
+            {reading.nonMonitoringReason?.split(" - ")[0] || "Facility Closed"}
+          </span>
+          <span className="mt-1 line-clamp-2 text-[10px] text-amber-800/80">
+            {reading.nonMonitoringReason || "Weekend / closure — sealed under gas"}
+          </span>
+        </div>
+      ) : (
+        <div className="flex justify-center gap-5 border-b border-border pb-3">
+          <Bar value={reading.airspace} label="Airspace" color={meta.bar} />
+          <Bar value={reading.probeCase} label="Probe" color={meta.bar} />
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted">
-        <span>Ambient {reading.ambientTemp ?? "—"}°C</span>
-        <span>Product {reading.productTemp ?? "—"}°C</span>
-        <span className="col-span-2">Humidity {reading.humidity ?? "—"}%</span>
+        {isNotMonitored ? (
+          <span className="col-span-2 text-center text-[10px] text-amber-700 italic">
+            Continuous exposure under seal
+          </span>
+        ) : (
+          <>
+            <span>Ambient {reading.ambientTemp ?? "—"}°C</span>
+            <span>Product {reading.productTemp ?? "—"}°C</span>
+            <span className="col-span-2">Humidity {reading.humidity ?? "—"}%</span>
+          </>
+        )}
       </div>
     </div>
   );
