@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { FccStatus, NotificationChannel, ReadingStatus, Role } from "@prisma/client";
 import { deriveReadingStatus, day0BlocksGasReadings, readingIsPhase2 } from "@/lib/readings";
-import { createExtensionSlotIfNeeded } from "@/lib/extend-monitoring";
+import { createExtensionSlotIfNeeded, cleanupOrphanedExtensionSlots } from "@/lib/extend-monitoring";
 import { emailCriticalReading } from "@/lib/notify-email";
 
 export async function POST(req: NextRequest) {
@@ -198,6 +198,15 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // If this was an edit, clean up any stale pending extension slots that
+        // are now orphaned because the cycle can be certified after the correction.
+        if (isEdit) {
+          await cleanupOrphanedExtensionSlots(tx, {
+            fccId: existing.fccId,
+            actorId: session.dbUser.id,
+          });
+        }
+
         const extendedReading = await createExtensionSlotIfNeeded(tx, {
           fccId: existing.fccId,
           actorId: session.dbUser.id,
@@ -328,6 +337,15 @@ export async function POST(req: NextRequest) {
           },
         },
       });
+
+      // If this was an edit, clean up any stale pending extension slots that
+      // are now orphaned because the cycle can be certified after the correction.
+      if (isEdit) {
+        await cleanupOrphanedExtensionSlots(tx, {
+          fccId: existing.fccId,
+          actorId: session.dbUser.id,
+        });
+      }
 
       const extendedReading = await createExtensionSlotIfNeeded(tx, {
         fccId: existing.fccId,
