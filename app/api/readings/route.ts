@@ -42,6 +42,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Reading not found" }, { status: 404 });
     }
 
+    if (existing.fcc.status === FccStatus.certified) {
+      return NextResponse.json(
+        { error: "Readings cannot be modified once the certificate is certified." },
+        { status: 409 }
+      );
+    }
+
     const siblingReadings = await prisma.gasReading.findMany({
       where: { fccId: existing.fccId },
       select: {
@@ -80,6 +87,8 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const isEdit = existing.status !== ReadingStatus.pending;
+
       const reading = await prisma.gasReading.update({
         where: { id: readingId },
         data: {
@@ -99,13 +108,14 @@ export async function POST(req: NextRequest) {
         data: {
           entityType: "GasReading",
           entityId: reading.id,
-          action: "record_day0_precheck",
+          action: isEdit ? "edit_day0_precheck" : "record_day0_precheck",
           actorId: session.dbUser.id,
           diff: {
             dayNumber: 0,
             ambientTempC: ambTempNum,
             productTempC: prodTempNum,
             productTempMeetsMinimum: prodTempNum >= 16,
+            isEdit,
           },
         },
       });
@@ -123,12 +133,16 @@ export async function POST(req: NextRequest) {
     const isNonMonitoring =
       requestedStatus === "not_monitored" ||
       requestedStatus === ReadingStatus.not_monitored;
+    const isEdit = existing.status !== ReadingStatus.pending;
 
     // ── Non-monitoring day (e.g. Saturday / Sunday weekend closure) ──────────
     if (isNonMonitoring) {
       const reason = (nonMonitoringReason || "Weekend closure / Facility closed").trim();
 
       const result = await prisma.$transaction(async (tx) => {
+        // If this reading previously had a corrective action, clean it up since it's now declared non-monitoring
+        await tx.correctiveAction.deleteMany({ where: { gasReadingId: readingId } });
+
         const reading = await tx.gasReading.update({
           where: { id: readingId },
           data: {
@@ -148,16 +162,38 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        let fcc = existing.fcc;
+
+        // Auto-unflag if previously flagged and no other critical readings exist
+        if (fcc.status === FccStatus.flagged) {
+          const otherCritical = await tx.gasReading.findFirst({
+            where: {
+              fccId: existing.fccId,
+              id: { not: readingId },
+              status: ReadingStatus.critical,
+            },
+          });
+          if (!otherCritical) {
+            await tx.fCC.update({
+              where: { id: fcc.id },
+              data: { status: FccStatus.in_progress },
+            });
+            fcc = { ...fcc, status: FccStatus.in_progress };
+          }
+        }
+
         await tx.auditLog.create({
           data: {
             entityType: "GasReading",
             entityId: reading.id,
-            action: "record_non_monitoring_day",
+            action: isEdit ? "edit_non_monitoring_day" : "record_non_monitoring_day",
             actorId: session.dbUser.id,
             diff: {
               dayNumber: reading.dayNumber,
               status: ReadingStatus.not_monitored,
               reason,
+              previousStatus: existing.status,
+              isEdit,
             },
           },
         });
@@ -167,7 +203,7 @@ export async function POST(req: NextRequest) {
           actorId: session.dbUser.id,
         });
 
-        return { reading, fcc: existing.fcc, extendedReading, phase2: false };
+        return { reading, fcc, extendedReading, phase2: false };
       });
 
       return NextResponse.json(result, { status: 200 });
@@ -186,7 +222,7 @@ export async function POST(req: NextRequest) {
     const status = deriveReadingStatus(airspace, probe);
 
     // Determine if this reading is in Phase 2 (post-120h window).
-    // Siblings NOT including the current row (it's still pending) are passed in.
+    // Siblings NOT including the current row (it's being saved) are passed in.
     const siblingsExcludingCurrent = siblingReadings.filter(
       (r) => r.dayNumber !== existing.dayNumber
     );
@@ -195,6 +231,11 @@ export async function POST(req: NextRequest) {
     const previousFccStatus = existing.fcc.status;
 
     const result = await prisma.$transaction(async (tx) => {
+      // If reading is now compliant, remove any previous corrective action
+      if (status === ReadingStatus.compliant) {
+        await tx.correctiveAction.deleteMany({ where: { gasReadingId: readingId } });
+      }
+
       const reading = await tx.gasReading.update({
         where: { id: readingId },
         data: {
@@ -221,9 +262,7 @@ export async function POST(req: NextRequest) {
 
       let fcc = existing.fcc;
 
-      // Only flag the FCC as critical when:
-      //   - Reading is critical (sub-600 ppm), AND
-      //   - We are NOT in Phase 2 (post-120h dissipation is acceptable).
+      // Handle flagging / unflagging
       if (status === ReadingStatus.critical && !phase2 && fcc.status !== FccStatus.flagged) {
         await tx.fCC.update({
           where: { id: fcc.id },
@@ -252,13 +291,29 @@ export async function POST(req: NextRequest) {
             })),
           });
         }
+      } else if (status === ReadingStatus.compliant && fcc.status === FccStatus.flagged) {
+        // Auto-unflag if this reading became compliant and no other critical readings remain
+        const otherCritical = await tx.gasReading.findFirst({
+          where: {
+            fccId: existing.fccId,
+            id: { not: readingId },
+            status: ReadingStatus.critical,
+          },
+        });
+        if (!otherCritical) {
+          await tx.fCC.update({
+            where: { id: fcc.id },
+            data: { status: FccStatus.in_progress },
+          });
+          fcc = { ...fcc, status: FccStatus.in_progress };
+        }
       }
 
       await tx.auditLog.create({
         data: {
           entityType: "GasReading",
           entityId: reading.id,
-          action: "record_gas_reading",
+          action: isEdit ? "edit_gas_reading" : "record_gas_reading",
           actorId: session.dbUser.id,
           diff: {
             dayNumber: reading.dayNumber,
@@ -266,8 +321,10 @@ export async function POST(req: NextRequest) {
             probeCasePpm: probe,
             status,
             phase2,
+            previousStatus: existing.status,
             previousFccStatus,
             fccStatus: fcc.status,
+            isEdit,
           },
         },
       });
@@ -280,7 +337,7 @@ export async function POST(req: NextRequest) {
       return { reading, fcc, extendedReading, phase2 };
     });
 
-    // Only email alert for Phase 1 critical readings
+    // Only email alert for Phase 1 critical readings (when not already flagged)
     if (
       status === ReadingStatus.critical &&
       !phase2 &&

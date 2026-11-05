@@ -34,6 +34,7 @@ type ApiReading = {
   productTempC: number | null;
   relativeHumidityPct: number | null;
   status: GasReading["status"];
+  nonMonitoringReason?: string | null;
   correctiveAction?: {
     description: string;
     actionTakenAt: string;
@@ -308,8 +309,11 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     day0Reading.ambientTemp != null &&
     day0Reading.productTemp != null &&
     day0Reading.productTemp >= PRODUCT_TEMP_MINIMUM_C;
-  const canUpdateDay0 = mapped16.every((r) => r.status === "pending");
-  const canLogGasReading = day0Ready && nextPendingDay !== null;
+  const isCertified = fcc?.status === "certified";
+  const canManageReadings = role !== "client" && !isCertified;
+  const canUpdateDay0 = mapped16.every((r) => r.status === "pending") && canManageReadings;
+  const canLogNewReading = canManageReadings && day0Ready && nextPendingDay !== null;
+  const canEditReading = canManageReadings && day0Ready;
 
   async function saveClientAttach() {
     if (!fcc || !selectedClientId) return;
@@ -384,6 +388,28 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     } finally {
       setSaving(false);
     }
+  }
+
+  function openEditReading(day: number) {
+    const row = readings.find((r) => r.dayNumber === day);
+    if (!row) return;
+
+    if (row.status === "not_monitored") {
+      setIsNonMonitoring(true);
+      setNonMonitoringReason(row.nonMonitoringReason || "Saturday - Weekend warehouse closure");
+      setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
+    } else {
+      setIsNonMonitoring(false);
+      setNonMonitoringReason("Saturday - Weekend warehouse closure");
+      setForm({
+        airspace: row.airspacePpm != null ? String(row.airspacePpm) : "",
+        probeCase: row.probeCasePpm != null ? String(row.probeCasePpm) : "",
+        ambientTemp: row.ambientTempC != null ? String(row.ambientTempC) : "",
+        productTemp: row.productTempC != null ? String(row.productTempC) : "",
+        humidity: row.relativeHumidityPct != null ? String(row.relativeHumidityPct) : "",
+      });
+    }
+    setLogging(day);
   }
 
   async function submitReading(day: number) {
@@ -882,7 +908,8 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               {mapped16.map((r) => (
                 <div key={r.day} className="space-y-2">
                   <GasDayGauge reading={r} />
-                  {canLogGasReading && r.status === "pending" && r.day === nextPendingDay && (
+                  {/* Pending slot — primary Log button */}
+                  {canLogNewReading && r.status === "pending" && r.day === nextPendingDay && (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -900,34 +927,57 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                         } else {
                           setIsNonMonitoring(false);
                         }
+                        setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
                         setLogging(r.day);
                       }}
                     >
                       Log reading
                     </Button>
                   )}
-                  {canLogGasReading && r.status === "not_monitored" && (
+
+                  {/* Critical day — Log action (red) AND Edit button to fix mistake */}
+                  {canEditReading && r.status === "critical" && (
+                    <div className="space-y-1">
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        className="w-full"
+                        onClick={() => setActionDay(r.day)}
+                      >
+                        Log action
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full text-xs text-muted hover:text-ink hover:bg-slate-100 border border-slate-200"
+                        onClick={() => openEditReading(r.day)}
+                      >
+                        Edit reading / fix entry
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Compliant or action_taken day — Edit reading */}
+                  {canEditReading && (r.status === "compliant" || r.status === "action_taken") && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs text-muted hover:text-ink hover:bg-slate-100 border border-slate-200"
+                      onClick={() => openEditReading(r.day)}
+                    >
+                      Edit reading
+                    </Button>
+                  )}
+
+                  {/* Non-monitored day — Edit closure */}
+                  {canEditReading && r.status === "not_monitored" && (
                     <Button
                       size="sm"
                       variant="ghost"
                       className="w-full text-xs text-amber-900 border border-amber-300 bg-amber-50/50 hover:bg-amber-100"
-                      onClick={() => {
-                        setIsNonMonitoring(true);
-                        setNonMonitoringReason(r.nonMonitoringReason || "Saturday - Weekend warehouse closure");
-                        setLogging(r.day);
-                      }}
+                      onClick={() => openEditReading(r.day)}
                     >
                       Edit closure / reading
-                    </Button>
-                  )}
-                  {r.status === "critical" && (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      className="w-full"
-                      onClick={() => setActionDay(r.day)}
-                    >
-                      Log action
                     </Button>
                   )}
                 </div>
@@ -940,7 +990,14 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           <Card className="mt-6 p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
               <div>
-                <p className="font-display text-lg text-primon-950">Day {logging} Entry</p>
+                {(() => {
+                const isExisting = readings.some((x) => x.dayNumber === logging && x.status !== "pending");
+                return (
+                  <p className="font-display text-lg text-primon-950">
+                    {isExisting ? `Edit Day ${logging} Entry` : `Day ${logging} Entry`}
+                  </p>
+                );
+              })()}
                 <p className="text-xs text-muted">
                   Record gas concentration levels or mark as a facility closure day (e.g. weekend/holiday).
                 </p>
@@ -1027,7 +1084,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                     disabled={!nonMonitoringReason.trim() || saving}
                     className="bg-amber-600 hover:bg-amber-700 text-white"
                   >
-                    Save Non-Monitoring Day
+                    {readings.some((x) => x.dayNumber === logging && x.status !== "pending")
+                      ? "Update Non-Monitoring Day"
+                      : "Save Non-Monitoring Day"}
                   </Button>
                 </div>
               </div>
@@ -1079,7 +1138,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                     onClick={() => submitReading(logging)}
                     disabled={!form.airspace || !form.probeCase || saving}
                   >
-                    Save reading
+                    {readings.some((x) => x.dayNumber === logging && x.status !== "pending")
+                      ? "Update reading"
+                      : "Save reading"}
                   </Button>
                 </div>
               </div>
