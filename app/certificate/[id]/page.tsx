@@ -49,13 +49,15 @@ export default function CertificatePage({ params }: { params: { id: string } }) 
           </Link>
         </div>
         {wo?.status === "certified" && (() => {
-          // Block download if any Day 1-6 ambient temperature is missing
+          // Block download only if a *monitored* Day 1-6 reading is missing its
+          // ambient temperature. not_monitored days (SAT / SUN / facility closed)
+          // carry no readings by design and must be excluded from this check.
           const missingAmbient = wo.readings
-            .filter((r) => r.day > 0)
+            .filter((r) => r.day > 0 && r.status !== "not_monitored")
             .some((r) => r.ambientTemp === null || r.ambientTemp === undefined);
           return missingAmbient ? (
             <span className="rounded bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800">
-              ⚠ Record all ambient temperatures before downloading
+              ⚠ Record ambient temperatures for all monitored days before downloading
             </span>
           ) : (
             <DownloadCertificateButton
