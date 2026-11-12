@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2 } from "lucide-react";
+import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2, Pencil, X } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { Topbar } from "@/components/topbar";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -50,6 +50,10 @@ type FccPayload = {
     code: string;
     cropType?: string;
     customProduct?: string | null;
+    scale?: string;
+    salesOrderNo?: string | null;
+    shipmentNo?: string | null;
+    deliveryNo?: string | null;
     client?: { id: string; name: string; email: string } | null;
   };
   fumigationDescription?: {
@@ -310,10 +314,79 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     day0Reading.productTemp != null &&
     day0Reading.productTemp >= PRODUCT_TEMP_MINIMUM_C;
   const isCertified = fcc?.status === "certified";
+  const canEditWo = (role === "ops_manager" || role === "admin") && !isCertified;
   const canManageReadings = role !== "client" && !isCertified;
   const canUpdateDay0 = mapped16.every((r) => r.status === "pending") && canManageReadings;
   const canLogNewReading = canManageReadings && day0Ready && nextPendingDay !== null;
   const canEditReading = canManageReadings && day0Ready;
+
+  const [editingWo, setEditingWo] = useState(false);
+  const [woForm, setWoForm] = useState({
+    code: "",
+    cropType: "tobacco",
+    customProduct: "",
+    salesOrderNo: "",
+    shipmentNo: "",
+    deliveryNo: "",
+  });
+  const [woFormError, setWoFormError] = useState<string | null>(null);
+  const [savingWo, setSavingWo] = useState(false);
+
+  function openEditWo() {
+    if (!fcc) return;
+    setWoForm({
+      code: fcc.workOrder.code || "",
+      cropType: fcc.workOrder.cropType || "tobacco",
+      customProduct: fcc.workOrder.customProduct || "",
+      salesOrderNo: fcc.workOrder.salesOrderNo || "",
+      shipmentNo: fcc.workOrder.shipmentNo || "",
+      deliveryNo: fcc.workOrder.deliveryNo || "",
+    });
+    setWoFormError(null);
+    setEditingWo(true);
+  }
+
+  async function handleSaveWo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fcc) return;
+    const cleanCode = woForm.code.trim();
+    if (!cleanCode) {
+      setWoFormError("Work order code is required.");
+      return;
+    }
+    if (woForm.cropType === "other" && !woForm.customProduct.trim()) {
+      setWoFormError("Please specify the custom commodity / product name.");
+      return;
+    }
+
+    setSavingWo(true);
+    setWoFormError(null);
+    try {
+      const res = await fetch(`/api/work-orders/${fcc.workOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: cleanCode,
+          cropType: woForm.cropType,
+          customProduct: woForm.cropType === "other" ? woForm.customProduct.trim() : null,
+          salesOrderNo: woForm.salesOrderNo.trim() || null,
+          shipmentNo: woForm.shipmentNo.trim() || null,
+          deliveryNo: woForm.deliveryNo.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update work order");
+      }
+      setEditingWo(false);
+      showToast("Work order details updated successfully.");
+      await load();
+    } catch (err: unknown) {
+      setWoFormError(err instanceof Error ? err.message : "Failed to update work order");
+    } finally {
+      setSavingWo(false);
+    }
+  }
 
   async function saveClientAttach() {
     if (!fcc || !selectedClientId) return;
@@ -585,7 +658,22 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       <Topbar
         title={fcc.workOrder.code}
         description={fcc.workOrder.client?.name ?? "—"}
-        action={<FccStatusPill status={fcc.status} />}
+        action={
+          <div className="flex items-center gap-2">
+            {canEditWo && (
+              <button
+                type="button"
+                onClick={openEditWo}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-medium text-primon-800 shadow-sm transition-colors hover:bg-slate-50 hover:text-primon-950"
+                title="Edit work order code & details"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                <span>Edit WO</span>
+              </button>
+            )}
+            <FccStatusPill status={fcc.status} />
+          </div>
+        }
       />
 
       <div className="px-6 py-8 lg:px-10">
@@ -604,6 +692,35 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
         )}
 
         <Card className="mb-6 p-6">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Work Order</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="font-display text-xl text-primon-950">{fcc.workOrder.code}</span>
+                {fcc.workOrder.cropType && (
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-700">
+                    {fcc.workOrder.cropType === "other"
+                      ? fcc.workOrder.customProduct || "Other"
+                      : fcc.workOrder.cropType}
+                  </span>
+                )}
+                {fcc.workOrder.salesOrderNo && (
+                  <span className="text-xs text-muted">SO: {fcc.workOrder.salesOrderNo}</span>
+                )}
+              </div>
+            </div>
+            {canEditWo && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={openEditWo}
+                className="flex items-center gap-1.5"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit work order
+              </Button>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
             <div>
               <p className="text-xs text-muted">Fumigant</p>
@@ -1352,6 +1469,109 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           </div>
         </div>
       </div>
+
+      {/* ── Edit Work Order Modal ── */}
+      {editingWo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-reveal-up">
+          <Card className="w-full max-w-lg p-6 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-border pb-3">
+              <div>
+                <h3 className="font-display text-lg text-primon-950">Edit Work Order</h3>
+                <p className="text-xs text-muted">
+                  Update work order code or reference numbers before certification.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingWo(false)}
+                className="rounded p-1 text-muted hover:bg-slate-100 hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {woFormError && (
+              <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-criticalTint p-3 text-xs text-status-critical">
+                {woFormError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveWo} className="mt-4 space-y-4">
+              <FormRow label="Work Order Code" required>
+                <TextInput
+                  value={woForm.code}
+                  onChange={(e) => setWoForm({ ...woForm, code: e.target.value })}
+                  placeholder="e.g. NYASA121-25 or WO-2026-0001"
+                  required
+                />
+              </FormRow>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormRow label="Commodity / Crop Type">
+                  <Select
+                    value={woForm.cropType}
+                    onChange={(e) => setWoForm({ ...woForm, cropType: e.target.value })}
+                  >
+                    <option value="tobacco">Tobacco</option>
+                    <option value="grain">Grain</option>
+                    <option value="other">Other / Specify</option>
+                  </Select>
+                </FormRow>
+
+                {woForm.cropType === "other" && (
+                  <FormRow label="Custom Product Name" required>
+                    <TextInput
+                      value={woForm.customProduct}
+                      onChange={(e) => setWoForm({ ...woForm, customProduct: e.target.value })}
+                      placeholder="e.g. Empty Sacks, Timber"
+                      required
+                    />
+                  </FormRow>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormRow label="Sales Order No.">
+                  <TextInput
+                    value={woForm.salesOrderNo}
+                    onChange={(e) => setWoForm({ ...woForm, salesOrderNo: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </FormRow>
+                <FormRow label="Shipment No.">
+                  <TextInput
+                    value={woForm.shipmentNo}
+                    onChange={(e) => setWoForm({ ...woForm, shipmentNo: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </FormRow>
+                <FormRow label="Delivery No.">
+                  <TextInput
+                    value={woForm.deliveryNo}
+                    onChange={(e) => setWoForm({ ...woForm, deliveryNo: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </FormRow>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditingWo(false)}
+                  disabled={savingWo}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={savingWo}>
+                  {savingWo ? "Saving changes…" : "Save changes"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

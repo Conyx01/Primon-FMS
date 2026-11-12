@@ -94,7 +94,9 @@ export async function PATCH(
   try {
     const body = await req.json();
     const {
+      code,
       cropType,
+      customProduct,
       scale,
       clientId,
       salesOrderNo,
@@ -104,10 +106,36 @@ export async function PATCH(
 
     const existing = await prisma.workOrder.findFirst({
       where: { OR: [{ id }, { code: id }] },
+      include: { fcc: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Work Order not found" }, { status: 404 });
+    }
+
+    if (existing.fcc?.status === "certified") {
+      return NextResponse.json(
+        { error: "Work orders cannot be modified once the certificate is certified." },
+        { status: 409 }
+      );
+    }
+
+    const nextCode = code !== undefined ? String(code).trim() : undefined;
+    if (nextCode !== undefined) {
+      if (!nextCode) {
+        return NextResponse.json({ error: "Work order code cannot be empty" }, { status: 400 });
+      }
+      if (nextCode !== existing.code) {
+        const conflict = await prisma.workOrder.findUnique({
+          where: { code: nextCode },
+        });
+        if (conflict) {
+          return NextResponse.json(
+            { error: `Work order code "${nextCode}" is already in use.` },
+            { status: 409 }
+          );
+        }
+      }
     }
 
     if (clientId !== undefined) {
@@ -139,7 +167,9 @@ export async function PATCH(
     const updated = await prisma.workOrder.update({
       where: { id: existing.id },
       data: {
+        ...(nextCode !== undefined && { code: nextCode }),
         ...(cropType && { cropType: cropType as CropType }),
+        ...(customProduct !== undefined && { customProduct: customProduct?.trim() || null }),
         ...(scale && { scale: scale as Scale }),
         ...(clientId !== undefined && { clientId: clientId || null }),
         ...(salesOrderNo !== undefined && { salesOrderNo: salesOrderNo?.trim() || null }),
@@ -150,6 +180,33 @@ export async function PATCH(
         client: { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true, email: true } },
         fcc: true,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        action: "edit_work_order",
+        actorId: session.dbUser.id,
+        diff: {
+          previous: {
+            code: existing.code,
+            cropType: existing.cropType,
+            customProduct: existing.customProduct,
+            salesOrderNo: existing.salesOrderNo,
+            shipmentNo: existing.shipmentNo,
+            deliveryNo: existing.deliveryNo,
+          },
+          updated: {
+            code: updated.code,
+            cropType: updated.cropType,
+            customProduct: updated.customProduct,
+            salesOrderNo: updated.salesOrderNo,
+            shipmentNo: updated.shipmentNo,
+            deliveryNo: updated.deliveryNo,
+          },
+        },
       },
     });
 
