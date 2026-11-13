@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Info, Leaf, Wheat, Box, Layers } from "lucide-react";
+import { Info, Leaf, Wheat, Box, Layers, Trash2 } from "lucide-react";
 import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -166,6 +166,30 @@ function NewWorkOrderWizard() {
   const [error, setError] = useState<string | null>(null);
   const [stock, setStock] = useState<StockFormulation[]>([]);
   const identityLocked = Boolean(workOrderId);
+
+  const [discarding, setDiscarding] = useState(false);
+  const [isDeletingDraft, setIsDeletingDraft] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
+
+  async function handleDiscardDraft() {
+    if (!workOrderId) return;
+    setIsDeletingDraft(true);
+    setDiscardError(null);
+    try {
+      const res = await fetch(`/api/work-orders/${workOrderId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to discard draft");
+      }
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      setDiscardError(err instanceof Error ? err.message : "Failed to discard draft");
+    } finally {
+      setIsDeletingDraft(false);
+    }
+  }
 
   // Load live stock
   useEffect(() => {
@@ -557,6 +581,21 @@ function NewWorkOrderWizard() {
             ? "Resume shipping instructions or fumigation description for this draft"
             : "Attach a client to create the draft, then complete SI and fumigation"
         }
+        action={
+          workOrderId ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDiscardError(null);
+                setDiscarding(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-status-critical shadow-sm transition-colors hover:bg-red-50 hover:text-red-800"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Discard draft</span>
+            </button>
+          ) : undefined
+        }
       />
 
       <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10">
@@ -572,13 +611,26 @@ function NewWorkOrderWizard() {
         )}
 
         {workOrderId && (
-          <div className="mb-4 flex items-start gap-3 rounded-xl border border-primon-200 bg-primon-50 p-4">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primon-700" />
-            <p className="text-xs leading-relaxed text-primon-800">
-              Draft <span className="font-medium">{displayCode}</span> exists and is visible
-              to the attached client in the portal. They can fill shipping instructions
-              there, or you can complete SI and fumigation here.
-            </p>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primon-200 bg-primon-50 p-4">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primon-700" />
+              <p className="text-xs leading-relaxed text-primon-800">
+                Draft <span className="font-medium">{displayCode}</span> exists and is visible
+                to the attached client in the portal. They can fill shipping instructions
+                there, or you can complete SI and fumigation here.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDiscardError(null);
+                setDiscarding(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-status-critical hover:bg-red-50 shrink-0"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Discard draft</span>
+            </button>
           </div>
         )}
 
@@ -1045,6 +1097,57 @@ function NewWorkOrderWizard() {
           </div>
         </Card>
       </div>
+
+      {/* ── Discard Draft Confirmation Modal ── */}
+      {discarding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-reveal-up">
+          <Card className="w-full max-w-md p-6 bg-white shadow-2xl border-red-200">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-red-100 p-2.5 text-status-critical shrink-0">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-lg text-primon-950">Discard Work Order Draft</h3>
+                <p className="mt-1 text-xs text-muted leading-relaxed">
+                  Are you sure you want to discard draft{" "}
+                  <strong className="text-ink">{displayCode}</strong>? This will permanently
+                  remove the draft work order and any saved progress.
+                </p>
+              </div>
+            </div>
+
+            {discardError && (
+              <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-criticalTint p-3 text-xs text-status-critical">
+                {discardError}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setDiscarding(false);
+                  setDiscardError(null);
+                }}
+                disabled={isDeletingDraft}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isDeletingDraft}
+                onClick={handleDiscardDraft}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeletingDraft ? "Discarding…" : "Yes, discard draft"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
