@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
-import { CropType, Role, Scale } from "@prisma/client";
+import { CropType, Role, Scale, StockMovementType } from "@prisma/client";
 
 export async function GET(
   req: NextRequest,
@@ -214,5 +214,113 @@ export async function PATCH(
   } catch (error: any) {
     console.error("PATCH /api/work-orders/[id] error:", error);
     return NextResponse.json({ error: "Failed to update work order" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSessionUser();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (
+    session.dbUser.role !== "admin" &&
+    session.dbUser.role !== "ops_manager"
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const existing = await prisma.workOrder.findFirst({
+      where: { OR: [{ id }, { code: id }] },
+      include: {
+        fcc: {
+          include: {
+            fumigationDescription: {
+              include: {
+                formulation: {
+                  include: { stockLevel: true },
+                },
+              },
+            },
+          },
+        },
+        stockMovements: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Work Order not found" }, { status: 404 });
+    }
+
+    if (existing.fcc?.status === "certified") {
+      return NextResponse.json(
+        { error: "Certified work orders and certificates cannot be deleted." },
+        { status: 409 }
+      );
+    }
+
+    const formulation = existing.fcc?.fumigationDescription?.formulation;
+    const stockLevel = formulation?.stockLevel;
+    const fumigantUsed = existing.fcc?.fumigationDescription?.totalFumigantUsedG ?? 0;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. If stock was previously deducted on this work order, refund it back to stockLevel
+      if (stockLevel && fumigantUsed > 0) {
+        await tx.stockLevel.update({
+          where: { id: stockLevel.id },
+          data: { quantityOnHand: { increment: fumigantUsed } },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            formulationId: formulation.id,
+            type: StockMovementType.addition,
+            quantity: fumigantUsed,
+            note: `Stock restored on deletion of work order ${existing.code}`,
+            performedById: session.dbUser.id,
+          },
+        });
+      }
+
+      // 2. Delete all stock movements referencing this work order
+      await tx.stockMovement.deleteMany({
+        where: { workOrderId: existing.id },
+      });
+
+      // 3. Delete the work order (Prisma cascades to FCC, gas readings, shipping instructions, etc.)
+      await tx.workOrder.delete({
+        where: { id: existing.id },
+      });
+
+      // 4. Log audit entry for tracking
+      await tx.auditLog.create({
+        data: {
+          entityType: "WorkOrder",
+          entityId: existing.id,
+          action: "delete_work_order",
+          actorId: session.dbUser.id,
+          diff: {
+            code: existing.code,
+            cropType: existing.cropType,
+            fccStatus: existing.fcc?.status,
+            refundedStockG: fumigantUsed > 0 ? fumigantUsed : null,
+          },
+        },
+      });
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Work order ${existing.code} successfully deleted.`,
+    });
+  } catch (error: any) {
+    console.error("DELETE /api/work-orders/[id] error:", error);
+    return NextResponse.json({ error: "Failed to delete work order" }, { status: 500 });
   }
 }

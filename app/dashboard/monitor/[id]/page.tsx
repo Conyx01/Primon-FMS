@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2, Pencil, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2, Pencil, X, Trash2 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { Topbar } from "@/components/topbar";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -168,6 +169,7 @@ function toLocalInput(value: string | null | undefined): string {
 }
 
 export default function MonitorDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
   const { role } = useCurrentUser();
   const canIssueCert = role === "ops_manager" || role === "admin";
   const canAttachClient = role === "ops_manager" || role === "admin";
@@ -385,6 +387,36 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
       setWoFormError(err instanceof Error ? err.message : "Failed to update work order");
     } finally {
       setSavingWo(false);
+    }
+  }
+
+  const [deletingWo, setDeletingWo] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleConfirmDelete() {
+    if (!fcc) return;
+    if (deleteInput.trim() !== fcc.workOrder.code) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/work-orders/${fcc.workOrder.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete work order");
+      }
+      setDeletingWo(false);
+      setEditingWo(false);
+      showToast(`Work order ${fcc.workOrder.code} has been permanently deleted.`);
+      router.push("/dashboard/monitor");
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete work order");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -1554,21 +1586,101 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 </FormRow>
               </div>
 
-              <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
-                <Button
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                <button
                   type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setEditingWo(false)}
-                  disabled={savingWo}
+                  onClick={() => {
+                    setEditingWo(false);
+                    setDeleteInput("");
+                    setDeleteError(null);
+                    setDeletingWo(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-status-critical hover:text-red-800 transition-colors"
                 >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={savingWo}>
-                  {savingWo ? "Saving changes…" : "Save changes"}
-                </Button>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete work order</span>
+                </button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditingWo(false)}
+                    disabled={savingWo}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="sm" disabled={savingWo}>
+                    {savingWo ? "Saving changes…" : "Save changes"}
+                  </Button>
+                </div>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Delete Work Order Modal (Vercel Confirmation Pattern) ── */}
+      {deletingWo && fcc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-reveal-up">
+          <Card className="w-full max-w-md p-6 bg-white shadow-2xl border-red-200">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-red-100 p-2.5 text-status-critical shrink-0">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-lg text-primon-950">Delete Work Order</h3>
+                <p className="mt-1 text-xs text-muted leading-relaxed">
+                  This action is permanent and cannot be undone. This will permanently remove{" "}
+                  <strong className="text-ink">{fcc.workOrder.code}</strong>, its draft FCC, and all
+                  associated staging data.
+                </p>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-criticalTint p-3 text-xs text-status-critical">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="mt-5 space-y-2">
+              <p className="text-xs font-medium text-ink">
+                To confirm deletion, type <span className="font-mono font-bold text-status-critical select-all">{fcc.workOrder.code}</span> below:
+              </p>
+              <TextInput
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                placeholder={fcc.workOrder.code}
+                className="font-mono text-xs border-red-200 focus:border-red-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setDeletingWo(false);
+                  setDeleteInput("");
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={deleteInput.trim() !== fcc.workOrder.code || isDeleting}
+                onClick={handleConfirmDelete}
+                className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-40"
+              >
+                {isDeleting ? "Deleting…" : "I understand, delete work order"}
+              </Button>
+            </div>
           </Card>
         </div>
       )}
