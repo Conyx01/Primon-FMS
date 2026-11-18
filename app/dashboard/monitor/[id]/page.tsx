@@ -321,6 +321,11 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const canUpdateDay0 = mapped16.every((r) => r.status === "pending") && canManageReadings;
   const canLogNewReading = canManageReadings && day0Ready && nextPendingDay !== null;
   const canEditReading = canManageReadings && day0Ready;
+  // "Extend monitoring" is offered when: ops/admin, not certified, all slots filled (no
+  // pending), and the cycle is already certifiable (bridged or standard 6-day complete).
+  // This lets Primon continue past the initial 6-day window for clients that need it.
+  const allSlotsFilled = mapped16.length > 0 && mapped16.every((r) => r.status !== "pending");
+  const canExtend = (role === "ops_manager" || role === "admin") && !isCertified && allSlotsFilled && allResolved;
 
   const [editingWo, setEditingWo] = useState(false);
   const [woForm, setWoForm] = useState({
@@ -394,6 +399,27 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   const [deleteInput, setDeleteInput] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ── Extend monitoring ──────────────────────────────────────────────────────
+  const [isExtending, setIsExtending] = useState(false);
+
+  async function handleExtendMonitoring() {
+    if (!fcc) return;
+    setIsExtending(true);
+    try {
+      const res = await fetch(`/api/fccs/${params.id}/extend`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to extend monitoring");
+      await load();
+      showToast(data.message ?? `Day ${data.dayNumber} monitoring slot added — log the reading when ready.`);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to extend monitoring");
+    } finally {
+      setIsExtending(false);
+    }
+  }
 
   async function handleConfirmDelete() {
     if (!fcc) return;
@@ -995,7 +1021,6 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               title="Gas-reading monitor"
               description={`All monitoring days are shown below. The certificate uses only the 5 consecutive lethal days (≥${LETHAL_THRESHOLD}ppm) plus the compliant 6th day.`}
             />
-
             {/* ── Streak progress bar ─────────────────────────── */}
             <div className="mx-6 mb-2 rounded-lg border border-border bg-slate-50 px-4 py-3">
               {streakResult.lethalWindowMet ? (
@@ -1132,6 +1157,29 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 </div>
               ))}
             </div>
+
+            {/* ── Extend monitoring button ───────────────────────────────── */}
+            {canExtend && (
+              <div className="border-t border-border px-6 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-ink">Need more reading days?</p>
+                  <p className="text-[11px] text-muted mt-0.5">
+                    All current slots are filled and the cycle is certifiable. If your client
+                    requires additional compliant days (e.g. after a weekend closure), add the
+                    next day manually — the fumigant remains under seal.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleExtendMonitoring}
+                  disabled={isExtending}
+                  className="shrink-0 flex items-center gap-1.5"
+                >
+                  {isExtending ? "Adding…" : "+ Extend monitoring"}
+                </Button>
+              </div>
+            )}
           </Card>
         )}
 
