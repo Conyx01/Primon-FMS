@@ -14,6 +14,7 @@ import {
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/kpi";
+import { Pagination } from "@/components/ui/pagination";
 import { PortalTopbar } from "@/components/portal-topbar";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { formatDate } from "@/lib/utils";
@@ -45,6 +46,8 @@ export default function PortalHomePage() {
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +128,12 @@ export default function PortalHomePage() {
       });
   }, [rows, activeTab, searchQuery, sortBy]);
 
+  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, currentPage]);
+
   const clientName = user?.name || "Client";
 
   const cropLabel = (r: PortalRow) =>
@@ -192,7 +201,7 @@ export default function PortalHomePage() {
                 placeholder="Search by code or certificate no…"
                 className="w-full rounded-lg border border-border bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-primon-500"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               />
             </div>
 
@@ -202,7 +211,7 @@ export default function PortalHomePage() {
               <select
                 className="rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primon-500"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                onChange={(e) => { setSortBy(e.target.value as SortOption); setCurrentPage(1); }}
               >
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
@@ -258,8 +267,9 @@ export default function PortalHomePage() {
           />
         ) : viewMode === "grid" ? (
           /* ── CARD GRID ── */
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredRows.map((w) => (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {paginatedRows.map((w) => (
               <Card
                 key={w.id}
                 className="flex flex-col p-5 transition-shadow hover:shadow-elevated"
@@ -309,6 +319,17 @@ export default function PortalHomePage() {
                 </div>
               </Card>
             ))}
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredRows.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setCurrentPage}
+                itemLabel="shipments"
+              />
+            </div>
           </div>
         ) : (
           /* ── TABLE VIEW ── */
@@ -325,7 +346,7 @@ export default function PortalHomePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredRows.map((w) => (
+                {paginatedRows.map((w) => (
                   <tr
                     key={w.id}
                     className="transition-colors hover:bg-slate-50/80"
@@ -372,6 +393,14 @@ export default function PortalHomePage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredRows.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+              itemLabel="shipments"
+            />
           </div>
         )}
       </div>

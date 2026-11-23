@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Activity, ClipboardCheck, PackageSearch, TriangleAlert, Search, Filter } from "lucide-react";
 import { Topbar } from "@/components/topbar";
@@ -9,6 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
 import { TextInput, Select } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -20,6 +21,8 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cropFilter, setCropFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     let isMounted = true;
@@ -80,6 +83,12 @@ export default function DashboardPage() {
 
     return matchesSearch && matchesStatus && matchesCrop;
   });
+
+  const totalPages = Math.ceil(filteredWorkOrders.length / PAGE_SIZE) || 1;
+  const paginatedWorkOrders = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredWorkOrders.slice(start, start + PAGE_SIZE);
+  }, [filteredWorkOrders, currentPage]);
 
   const active = displayWorkOrders.filter(
     (w) => (w.fcc?.status ?? w.status) !== "certified"
@@ -162,13 +171,13 @@ export default function DashboardPage() {
                         placeholder="Search WO or Client..."
                         className="pl-8 text-xs py-1.5 h-9"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                       />
                     </div>
                     <Select
                       className="text-xs py-1.5 h-9 w-28"
                       value={cropFilter}
-                      onChange={(e) => setCropFilter(e.target.value)}
+                      onChange={(e) => { setCropFilter(e.target.value); setCurrentPage(1); }}
                     >
                       <option value="all">All Crops</option>
                       <option value="tobacco">Tobacco</option>
@@ -178,7 +187,7 @@ export default function DashboardPage() {
                     <Select
                       className="text-xs py-1.5 h-9 w-28"
                       value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
+                      onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                     >
                       <option value="all">All Status</option>
                       <option value="draft">Draft</option>
@@ -210,7 +219,7 @@ export default function DashboardPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredWorkOrders.map((w) => {
+                      paginatedWorkOrders.map((w) => {
                         const status = w.fcc?.status ?? w.status;
                         const clientName = typeof w.client === "string" ? w.client : w.client?.name ?? "—";
                         return (
@@ -243,6 +252,14 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredWorkOrders.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setCurrentPage}
+                itemLabel="work orders"
+              />
             </Card>
           </section>
 

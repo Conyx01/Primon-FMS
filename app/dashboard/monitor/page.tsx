@@ -17,6 +17,7 @@ import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { FccStatusPill } from "@/components/ui/status-pill";
 import { EmptyState } from "@/components/ui/kpi";
+import { Pagination } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils";
 import type { FccStatus } from "@/lib/types";
 
@@ -49,6 +50,8 @@ export default function MonitorListPage() {
   const [clientFilter, setClientFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortOption>("urgency");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     let cancelled = false;
@@ -186,6 +189,12 @@ export default function MonitorListPage() {
       });
   }, [analyzedRows, activeTab, clientFilter, searchQuery, sortBy]);
 
+  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, currentPage]);
+
   return (
     <div className="pb-16">
       <Topbar
@@ -197,7 +206,7 @@ export default function MonitorListPage() {
         {/* Status Category Tabs */}
         <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-border pb-4">
           <button
-            onClick={() => setActiveTab("all")}
+            onClick={() => { setActiveTab("all"); setCurrentPage(1); }}
             className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
               activeTab === "all"
                 ? "bg-primon-900 text-white shadow-sm"
@@ -215,7 +224,7 @@ export default function MonitorListPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("active")}
+            onClick={() => { setActiveTab("active"); setCurrentPage(1); }}
             className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
               activeTab === "active"
                 ? "bg-primon-900 text-white shadow-sm"
@@ -234,7 +243,7 @@ export default function MonitorListPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("critical")}
+            onClick={() => { setActiveTab("critical"); setCurrentPage(1); }}
             className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
               activeTab === "critical"
                 ? "bg-red-600 text-white shadow-sm"
@@ -259,7 +268,7 @@ export default function MonitorListPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("ready")}
+            onClick={() => { setActiveTab("ready"); setCurrentPage(1); }}
             className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
               activeTab === "ready"
                 ? "bg-emerald-700 text-white shadow-sm"
@@ -278,7 +287,7 @@ export default function MonitorListPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("certified")}
+            onClick={() => { setActiveTab("certified"); setCurrentPage(1); }}
             className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
               activeTab === "certified"
                 ? "bg-primon-900 text-white shadow-sm"
@@ -307,7 +316,7 @@ export default function MonitorListPage() {
                 placeholder="Search work order or client…"
                 className="w-full rounded-lg border border-border bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-primon-500"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               />
             </div>
 
@@ -318,7 +327,7 @@ export default function MonitorListPage() {
                 <select
                   className="rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primon-500"
                   value={clientFilter}
-                  onChange={(e) => setClientFilter(e.target.value)}
+                  onChange={(e) => { setClientFilter(e.target.value); setCurrentPage(1); }}
                 >
                   <option value="all">All Clients ({uniqueClients.length})</option>
                   {uniqueClients.map((c) => (
@@ -336,7 +345,7 @@ export default function MonitorListPage() {
               <select
                 className="rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primon-500"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                onChange={(e) => { setSortBy(e.target.value as SortOption); setCurrentPage(1); }}
               >
                 <option value="urgency">Sort by Urgency (Critical first)</option>
                 <option value="newest">Date Placed (Newest first)</option>
@@ -389,8 +398,9 @@ export default function MonitorListPage() {
           />
         ) : viewMode === "grid" ? (
           /* ── GRID VIEW ── */
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredRows.map((w) => {
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {paginatedRows.map((w) => {
               const gasReadingsSorted = w.readings
                 .slice()
                 .sort((a, b) => a.dayNumber - b.dayNumber);
@@ -475,6 +485,17 @@ export default function MonitorListPage() {
                 </Link>
               );
             })}
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredRows.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setCurrentPage}
+                itemLabel="monitored work orders"
+              />
+            </div>
           </div>
         ) : (
           /* ── TABLE VIEW (Optimized for 50-100 work orders) ── */
@@ -491,7 +512,7 @@ export default function MonitorListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredRows.map((w) => {
+                {paginatedRows.map((w) => {
                   return (
                     <tr
                       key={w.id}
@@ -571,6 +592,14 @@ export default function MonitorListPage() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredRows.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+              itemLabel="monitored work orders"
+            />
           </div>
         )}
       </div>
