@@ -36,6 +36,9 @@ type ApiFcc = {
     gradeName: string | null;
     caseNos: string | null;
     countryOfOrigin: string | null;
+    containerNo?: string | null;
+    sealNo?: string | null;
+    additionalInfo?: string | null;
     location: string | null;
     warehouseSection: string | null;
     lockedAt?: string | null;
@@ -95,6 +98,9 @@ function emptySi(): ShippingInstructions {
     gradeName: "",
     caseNos: "",
     countryOfOrigin: "",
+    containerNo: "",
+    sealNo: "",
+    additionalInfo: "",
     location: "",
     warehouseSection: "",
     complete: false,
@@ -121,6 +127,9 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
         gradeName: siRow.gradeName ?? "",
         caseNos: siRow.caseNos ?? "",
         countryOfOrigin: siRow.countryOfOrigin ?? "",
+        containerNo: siRow.containerNo ?? "",
+        sealNo: siRow.sealNo ?? "",
+        additionalInfo: siRow.additionalInfo ?? "",
         location: siRow.location ?? "",
         warehouseSection: siRow.warehouseSection ?? "",
         complete: Boolean(siRow.tobaccoSupplier && siRow.consignee),

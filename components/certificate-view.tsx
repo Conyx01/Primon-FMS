@@ -237,28 +237,63 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               ? "Grain Description"
               : `${titleCase(wo.customProduct || "Product")} Description`}
         </SectionTitle>
-        <div className="grid grid-cols-4 gap-x-4 gap-y-1 border border-gray-300 p-2 text-[9px]">
-          <Field
-            label={
-              wo.cropType === "tobacco"
-                ? "Tobacco Type"
-                : wo.cropType === "grain"
-                  ? "Grain Type"
-                  : "Product Type"
-            }
-            value={si.productType || si.tobaccoType || wo.customProduct || "—"}
-          />
-          <Field label="Grade Name" value={si.gradeName || "—"} />
-          <Field label="Crop Year" value={si.cropYear || "—"} />
-          <Field label="Country of Origin" value={si.countryOfOrigin || "—"} />
-          <Field label="Net Weight (kg)" value={si.netWeight || "—"} />
-          <Field label="Gross Weight (kg)" value={si.grossWeight || "—"} />
-          <Field label="Quantity (bales/cases)" value={si.quantity || "—"} />
-          <Field label="Polylined" value={si.polylined || "—"} />
-          <Field label="Case Nos." value={si.caseNos || "—"} />
-          <Field label="Location" value={si.location || "—"} />
-          <Field label="Warehouse Section" value={si.warehouseSection || "—"} className="col-span-2" />
-        </div>
+        {Boolean(si.additionalInfo?.trim()) ? (
+          <div className="flex border border-gray-300 text-[9px]">
+            <div className="grid flex-1 grid-cols-4 gap-x-3 gap-y-1 p-2 border-r border-gray-300">
+              <Field
+                label={
+                  wo.cropType === "tobacco"
+                    ? "Tobacco Type"
+                    : wo.cropType === "grain"
+                      ? "Grain Type"
+                      : "Product Type"
+                }
+                value={si.productType || si.tobaccoType || wo.customProduct || "—"}
+              />
+              <Field label="Grade Name" value={si.gradeName || "—"} />
+              <Field label="Crop Year" value={si.cropYear || "—"} />
+              <Field label="Country of Origin" value={si.countryOfOrigin || "—"} />
+              <Field label="Net Weight (kg)" value={si.netWeight || "—"} />
+              <Field label="Gross Weight (kg)" value={si.grossWeight || "—"} />
+              <Field label="Quantity (bales/cases)" value={si.quantity || "—"} />
+              <Field label="Polylined" value={si.polylined || "—"} />
+              <Field label="Case Nos." value={si.caseNos || "—"} />
+              <Field label="Container No." value={si.containerNo || "—"} />
+              <Field label="Seal No." value={si.sealNo || "—"} className="col-span-2" />
+            </div>
+            <div className="w-[28%] min-w-[180px] bg-gray-50/50 p-2 flex flex-col justify-start">
+              <span className="block text-[7.5px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                Additional Information
+              </span>
+              <p className="whitespace-pre-line text-[8.5px] leading-tight text-gray-800 font-medium">
+                {si.additionalInfo?.trim()}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-x-4 gap-y-1 border border-gray-300 p-2 text-[9px]">
+            <Field
+              label={
+                wo.cropType === "tobacco"
+                  ? "Tobacco Type"
+                  : wo.cropType === "grain"
+                    ? "Grain Type"
+                    : "Product Type"
+              }
+              value={si.productType || si.tobaccoType || wo.customProduct || "—"}
+            />
+            <Field label="Grade Name" value={si.gradeName || "—"} />
+            <Field label="Crop Year" value={si.cropYear || "—"} />
+            <Field label="Country of Origin" value={si.countryOfOrigin || "—"} />
+            <Field label="Net Weight (kg)" value={si.netWeight || "—"} />
+            <Field label="Gross Weight (kg)" value={si.grossWeight || "—"} />
+            <Field label="Quantity (bales/cases)" value={si.quantity || "—"} />
+            <Field label="Polylined" value={si.polylined || "—"} />
+            <Field label="Case Nos." value={si.caseNos || "—"} />
+            <Field label="Container No." value={si.containerNo || "—"} />
+            <Field label="Seal No." value={si.sealNo || "—"} className="col-span-2" />
+          </div>
+        )}
       </section>
 
       {/* ── SECTION 3: FUMIGATION DESCRIPTION ── */}

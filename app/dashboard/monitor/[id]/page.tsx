@@ -78,6 +78,9 @@ type FccPayload = {
     gradeName: string | null;
     caseNos: string | null;
     countryOfOrigin: string | null;
+    containerNo?: string | null;
+    sealNo?: string | null;
+    additionalInfo?: string | null;
     location: string | null;
     warehouseSection: string | null;
     lockedAt?: string | null;
@@ -131,6 +134,9 @@ function siFromFcc(fcc: FccPayload): ShippingInstructions {
       gradeName: "",
       caseNos: "",
       countryOfOrigin: "Malawi",
+      containerNo: "",
+      sealNo: "",
+      additionalInfo: "",
       location: "",
       warehouseSection: "",
       complete: false,
@@ -153,6 +159,9 @@ function siFromFcc(fcc: FccPayload): ShippingInstructions {
     gradeName: row.gradeName ?? "",
     caseNos: row.caseNos ?? "",
     countryOfOrigin: row.countryOfOrigin ?? "",
+    containerNo: row.containerNo ?? "",
+    sealNo: row.sealNo ?? "",
+    additionalInfo: row.additionalInfo ?? "",
     location: row.location ?? "",
     warehouseSection: row.warehouseSection ?? "",
     complete: isShippingInstructionsComplete(row),
@@ -1082,31 +1091,42 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               {mapped16.map((r) => (
                 <div key={r.day} className="space-y-2">
                   <GasDayGauge reading={r} />
-                  {/* Pending slot — primary Log button */}
+                  {/* Pending slot — primary Log button & Holiday/Closed quick action */}
                   {canLogNewReading && r.status === "pending" && r.day === nextPendingDay && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        const rowDate = r.date ? new Date(r.date) : null;
-                        const isWeekend = rowDate ? (rowDate.getUTCDay() === 0 || rowDate.getUTCDay() === 6) : false;
-                        if (isWeekend) {
+                    <div className="space-y-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => {
+                          setIsNonMonitoring(false);
+                          setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
+                          setLogging(r.day);
+                        }}
+                      >
+                        Log reading
+                      </Button>
+                      <button
+                        type="button"
+                        className="w-full text-center text-[11px] font-medium text-amber-700 hover:text-amber-900 hover:underline py-0.5"
+                        onClick={() => {
+                          const rowDate = r.date ? new Date(r.date) : null;
+                          const dayOfWeek = rowDate?.getUTCDay();
                           setIsNonMonitoring(true);
                           setNonMonitoringReason(
-                            rowDate?.getUTCDay() === 6
+                            dayOfWeek === 6
                               ? "Saturday - Weekend warehouse closure"
-                              : "Sunday - Weekend warehouse closure"
+                              : dayOfWeek === 0
+                              ? "Sunday - Weekend warehouse closure"
+                              : "Public Holiday / Facility closed"
                           );
-                        } else {
-                          setIsNonMonitoring(false);
-                        }
-                        setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
-                        setLogging(r.day);
-                      }}
-                    >
-                      Log reading
-                    </Button>
+                          setForm({ airspace: "", probeCase: "", ambientTemp: "", productTemp: "", humidity: "" });
+                          setLogging(r.day);
+                        }}
+                      >
+                        Mark holiday / closed
+                      </button>
+                    </div>
                   )}
 
                   {/* Critical day — Log action (red) AND Edit button to fix mistake */}
@@ -1222,7 +1242,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                       : "text-muted hover:text-ink"
                   )}
                 >
-                  Non-Monitoring (Closed / Weekend)
+                  Non-Monitoring (Closed / Holiday)
                 </button>
               </div>
             </div>
@@ -1242,9 +1262,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                   <Label>Select reason for no reading</Label>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {[
+                      "Public Holiday / Facility closed",
                       "Saturday - Weekend warehouse closure",
                       "Sunday - Weekend warehouse closure",
-                      "Public Holiday / Facility closed",
                       "Client warehouse closed",
                     ].map((reasonOption) => (
                       <button

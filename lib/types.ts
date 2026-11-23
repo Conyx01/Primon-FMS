@@ -27,6 +27,9 @@ export interface ShippingInstructions {
   gradeName: string;
   caseNos: string;
   countryOfOrigin: string;
+  containerNo?: string;
+  sealNo?: string;
+  additionalInfo?: string;
   location: string;
   warehouseSection: string;
   complete: boolean;

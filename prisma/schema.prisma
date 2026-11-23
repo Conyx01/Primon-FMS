@@ -228,6 +228,9 @@ model ShippingInstructions {
   gradeName              String?
   caseNos                String?
   countryOfOrigin        String?
+  containerNo            String?
+  sealNo                 String?
+  additionalInfo         String?
   location               String?
   warehouseSection       String?
   lockedAt               DateTime?

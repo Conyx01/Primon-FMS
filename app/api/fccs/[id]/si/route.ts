@@ -70,6 +70,9 @@ export async function PATCH(
       gradeName,
       caseNos,
       countryOfOrigin = "Malawi",
+      containerNo,
+      sealNo,
+      additionalInfo,
       location,
       warehouseSection,
     } = body;
@@ -118,6 +121,9 @@ export async function PATCH(
       ...(gradeName !== undefined && { gradeName: gradeName?.trim() || null }),
       ...(caseNos !== undefined && { caseNos: caseNos?.trim() || null }),
       ...(countryOfOrigin !== undefined && { countryOfOrigin: countryOfOrigin?.trim() || "Malawi" }),
+      ...(containerNo !== undefined && { containerNo: containerNo?.trim() || null }),
+      ...(sealNo !== undefined && { sealNo: sealNo?.trim() || null }),
+      ...(additionalInfo !== undefined && { additionalInfo: additionalInfo?.trim() || null }),
       ...(location !== undefined && { location: location?.trim() || null }),
       ...(warehouseSection !== undefined && { warehouseSection: warehouseSection?.trim() || null }),
     };

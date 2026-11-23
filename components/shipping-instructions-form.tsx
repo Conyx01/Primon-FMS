@@ -15,6 +15,9 @@ type Props = {
 export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Props) {
   const locked = Boolean(initial.locked);
   const [si, setSi] = useState<ShippingInstructions>(initial);
+  const [showAdditionalInfo, setShowAdditionalInfo] = useState(
+    Boolean(initial.additionalInfo?.trim())
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -46,6 +49,9 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
           gradeName: si.gradeName,
           caseNos: si.caseNos,
           countryOfOrigin: si.countryOfOrigin,
+          containerNo: si.containerNo,
+          sealNo: si.sealNo,
+          additionalInfo: si.additionalInfo,
           location: si.location,
           warehouseSection: si.warehouseSection,
         }),
@@ -178,21 +184,65 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
             <option value="No">No</option>
           </Select>
         </FormRow>
-        <FormRow label="Location">
+        <FormRow label="Container No.">
           <TextInput
-            value={si.location}
+            placeholder="e.g. MSKU-9182374"
+            value={si.containerNo ?? ""}
             disabled={locked}
-            onChange={(e) => setSi({ ...si, location: e.target.value })}
+            onChange={(e) => setSi({ ...si, containerNo: e.target.value })}
           />
         </FormRow>
-        <FormRow label="Warehouse section">
+        <FormRow label="Seal No.">
           <TextInput
-            value={si.warehouseSection}
+            placeholder="e.g. MLW-849204"
+            value={si.sealNo ?? ""}
             disabled={locked}
-            onChange={(e) => setSi({ ...si, warehouseSection: e.target.value })}
+            onChange={(e) => setSi({ ...si, sealNo: e.target.value })}
           />
         </FormRow>
       </div>
+
+      {/* ── Additional Information (Collapsible) ── */}
+      <div className="mt-5 border-t border-border pt-4">
+        {!showAdditionalInfo ? (
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => setShowAdditionalInfo(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primon-700 hover:text-primon-900 disabled:opacity-50"
+          >
+            + Add additional information
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-ink">
+                Additional Information
+              </label>
+              {!locked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdditionalInfo(false);
+                    setSi({ ...si, additionalInfo: "" });
+                  }}
+                  className="text-xs text-muted hover:text-red-600"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <textarea
+              className="h-24 w-full rounded-lg border border-border p-3 text-sm outline-none focus:border-primon-500 disabled:bg-slate-50"
+              placeholder="e.g. Acid application specifications, chemical treatment notes, special export clauses..."
+              value={si.additionalInfo ?? ""}
+              disabled={locked}
+              onChange={(e) => setSi({ ...si, additionalInfo: e.target.value })}
+            />
+          </div>
+        )}
+      </div>
+
       {error && <p className="mt-4 text-xs text-status-critical">{error}</p>}
       {saved && !error && (
         <p className="mt-4 text-xs text-status-compliant">Shipping instructions updated.</p>
