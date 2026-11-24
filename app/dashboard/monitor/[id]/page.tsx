@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2, Pencil, X, Trash2 } from "lucide-react";
+import { ArrowLeft, TriangleAlert, ShieldCheck, FileCheck2, Pencil, X, Trash2, FileEdit, ShieldAlert } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { Topbar } from "@/components/topbar";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -45,6 +45,7 @@ type ApiReading = {
 
 type FccPayload = {
   id: string;
+  certificateNumber?: string | null;
   status: FccStatus;
   workOrder: {
     id: string;
@@ -335,6 +336,148 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   // This lets Primon continue past the initial 6-day window for clients that need it.
   const allSlotsFilled = mapped16.length > 0 && mapped16.every((r) => r.status !== "pending");
   const canExtend = (role === "ops_manager" || role === "admin") && !isCertified && allSlotsFilled && allResolved;
+  const canAmendCertificate = role === "admin" && Boolean(isCertified);
+
+  const [amendingCert, setAmendingCert] = useState(false);
+  const [amendTab, setAmendTab] = useState<"shipping" | "references" | "signatories">("shipping");
+  const [amendReason, setAmendReason] = useState("");
+  const [amendFormError, setAmendFormError] = useState<string | null>(null);
+  const [savingAmend, setSavingAmend] = useState(false);
+  const [amendForm, setAmendForm] = useState({
+    code: "",
+    cropType: "tobacco",
+    customProduct: "",
+    salesOrderNo: "",
+    shipmentNo: "",
+    deliveryNo: "",
+    tobaccoSupplier: "",
+    supplierAddress: "",
+    consignee: "",
+    consigneeAddress: "",
+    cropYear: "",
+    productType: "",
+    netWeight: "",
+    grossWeight: "",
+    quantity: "",
+    gradeName: "",
+    caseNos: "",
+    countryOfOrigin: "Malawi",
+    containerNo: "",
+    sealNo: "",
+    polylined: "No",
+    additionalInfo: "",
+    supervising_fumigator: "",
+    supplier_rep: "",
+    certifying_officer: "",
+  });
+
+  function openAmendModal() {
+    if (!fcc) return;
+    const si = siFromFcc(fcc);
+    setAmendForm({
+      code: fcc.workOrder.code || "",
+      cropType: fcc.workOrder.cropType || "tobacco",
+      customProduct: fcc.workOrder.customProduct || "",
+      salesOrderNo: fcc.workOrder.salesOrderNo || "",
+      shipmentNo: fcc.workOrder.shipmentNo || "",
+      deliveryNo: fcc.workOrder.deliveryNo || "",
+      tobaccoSupplier: si.tobaccoSupplier || "",
+      supplierAddress: si.supplierAddress || "",
+      consignee: si.consignee || "",
+      consigneeAddress: si.consigneeAddress || "",
+      cropYear: si.cropYear || "",
+      productType: si.productType || "",
+      netWeight: si.netWeight || "",
+      grossWeight: si.grossWeight || "",
+      quantity: si.quantity || "",
+      gradeName: si.gradeName || "",
+      caseNos: si.caseNos || "",
+      countryOfOrigin: si.countryOfOrigin || "Malawi",
+      containerNo: si.containerNo || "",
+      sealNo: si.sealNo || "",
+      polylined: si.polylined || "No",
+      additionalInfo: si.additionalInfo || "",
+      supervising_fumigator: signers.supervising_fumigator || "Prince Chiwalo",
+      supplier_rep: signers.supplier_rep || "",
+      certifying_officer: signers.certifying_officer || "",
+    });
+    setAmendReason("");
+    setAmendFormError(null);
+    setAmendTab("shipping");
+    setAmendingCert(true);
+  }
+
+  async function handleSaveAmendment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fcc) return;
+    const cleanReason = amendReason.trim();
+    if (!cleanReason) {
+      setAmendFormError("A mandatory reason for amendment is required (e.g. client requested typo correction).");
+      return;
+    }
+    const cleanCode = amendForm.code.trim();
+    if (!cleanCode) {
+      setAmendFormError("Work order code is required.");
+      return;
+    }
+    if (amendForm.cropType === "other" && !amendForm.customProduct.trim()) {
+      setAmendFormError("Please specify the custom product name.");
+      return;
+    }
+
+    setSavingAmend(true);
+    setAmendFormError(null);
+
+    try {
+      const res = await fetch(`/api/fccs/${fcc.id}/amend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: cleanReason,
+          code: cleanCode,
+          cropType: amendForm.cropType,
+          customProduct: amendForm.customProduct,
+          salesOrderNo: amendForm.salesOrderNo,
+          shipmentNo: amendForm.shipmentNo,
+          deliveryNo: amendForm.deliveryNo,
+          tobaccoSupplier: amendForm.tobaccoSupplier,
+          tobaccoSupplierAddress: amendForm.supplierAddress,
+          consignee: amendForm.consignee,
+          consigneeAddress: amendForm.consigneeAddress,
+          cropYear: amendForm.cropYear,
+          productType: amendForm.productType,
+          netWeight: amendForm.netWeight,
+          grossWeight: amendForm.grossWeight,
+          quantity: amendForm.quantity,
+          gradeName: amendForm.gradeName,
+          caseNos: amendForm.caseNos,
+          countryOfOrigin: amendForm.countryOfOrigin,
+          containerNo: amendForm.containerNo,
+          sealNo: amendForm.sealNo,
+          polylined: amendForm.polylined,
+          additionalInfo: amendForm.additionalInfo,
+          signers: {
+            supervising_fumigator: amendForm.supervising_fumigator,
+            supplier_rep: amendForm.supplier_rep,
+            certifying_officer: amendForm.certifying_officer,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to amend certified FCC");
+      }
+
+      setAmendingCert(false);
+      showToast(`Certificate ${data.certificateNumber || fcc.certificateNumber} amended successfully. Audit trail logged.`);
+      await load();
+    } catch (err: unknown) {
+      setAmendFormError(err instanceof Error ? err.message : "Failed to save amendment");
+    } finally {
+      setSavingAmend(false);
+    }
+  }
 
   const [editingWo, setEditingWo] = useState(false);
   const [woForm, setWoForm] = useState({
@@ -738,6 +881,17 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                 <span>Edit WO</span>
               </button>
             )}
+            {canAmendCertificate && (
+              <button
+                type="button"
+                onClick={openAmendModal}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primon-300 bg-primon-50 px-3 py-1.5 text-xs font-semibold text-primon-950 shadow-sm transition-colors hover:bg-primon-100"
+                title="Admin amendment for certified certificate"
+              >
+                <FileEdit className="h-3.5 w-3.5 text-brass-600" />
+                <span>Amend Certificate</span>
+              </button>
+            )}
             <FccStatusPill status={fcc.status} />
           </div>
         }
@@ -858,6 +1012,24 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               </Link>
             </div>
           </Card>
+        )}
+
+        {canAmendCertificate && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primon-200 bg-primon-50/70 px-4 py-3 text-xs text-primon-900 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert className="h-4 w-4 text-brass-600 shrink-0" />
+              <span>
+                <strong>Certified Lock Active:</strong> Need to correct a client mistake on consignee, weights, seal, or container numbers?
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={openAmendModal}
+              className="inline-flex items-center gap-1.5 font-semibold text-primon-800 hover:text-primon-950 underline underline-offset-2 shrink-0"
+            >
+              <FileEdit className="h-3.5 w-3.5 text-brass-600" /> Amend as Admin
+            </button>
+          </div>
         )}
 
         <div className="mb-6">
@@ -1545,7 +1717,17 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {canAmendCertificate && (
+              <Button
+                variant="secondary"
+                onClick={openAmendModal}
+                className="border-primon-300 bg-primon-50/70 hover:bg-primon-100 text-primon-950 font-medium"
+              >
+                <FileEdit className="mr-1.5 h-3.5 w-3.5 text-brass-600" />
+                Amend Certificate
+              </Button>
+            )}
             <Link href={`/certificate/${fcc.workOrder.id}`}>
               <Button variant="secondary">
                 {fcc.status === "certified" ? "View certificate" : "Preview certificate"}
@@ -1569,6 +1751,335 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
           </div>
         </div>
       </div>
+
+      {/* ── Admin Amend Certified Certificate Modal ── */}
+      {amendingCert && fcc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-reveal-up overflow-y-auto">
+          <Card className="w-full max-w-2xl p-6 bg-white shadow-2xl my-8">
+            <div className="flex items-start justify-between border-b border-border pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-lg text-primon-950">Amend Certified Certificate</h3>
+                  <span className="rounded-md bg-brass-100 px-2 py-0.5 text-[10px] font-semibold text-brass-800 border border-brass-200">
+                    Admin Only
+                  </span>
+                </div>
+                <p className="text-xs text-muted mt-0.5">
+                  Correct client mistakes on <strong className="text-ink">{fcc.certificateNumber || fcc.workOrder.code}</strong>.
+                  All changes are permanently recorded in the audit trail.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAmendingCert(false)}
+                className="rounded p-1 text-muted hover:bg-slate-100 hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {amendFormError && (
+              <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-criticalTint p-3 text-xs text-status-critical">
+                {amendFormError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAmendment} className="mt-4 space-y-5">
+              {/* Mandatory Reason for Amendment */}
+              <div className="rounded-lg border border-brass-200 bg-primon-50/60 p-4 space-y-1.5">
+                <label className="flex items-center justify-between text-xs font-semibold text-primon-950">
+                  <span>Reason for Amendment (Required by Audit Policy) *</span>
+                  <span className="text-[10px] font-normal text-muted">Stored in AuditLog</span>
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  value={amendReason}
+                  onChange={(e) => setAmendReason(e.target.value)}
+                  placeholder="e.g. Alliance One requested updated container number MSCU123456 and corrected consignee address typo"
+                  className="w-full rounded-md border border-border bg-white p-2.5 text-xs text-ink placeholder:text-muted focus:border-primon-600 focus:outline-none"
+                />
+              </div>
+
+              {/* Segmented Navigation Tabs */}
+              <div className="flex rounded-lg border border-border bg-slate-50 p-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAmendTab("shipping")}
+                  className={`flex-1 rounded-md py-1.5 font-medium transition-all ${
+                    amendTab === "shipping"
+                      ? "bg-white text-primon-950 shadow-sm"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Shipping Instructions & Cargo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAmendTab("references")}
+                  className={`flex-1 rounded-md py-1.5 font-medium transition-all ${
+                    amendTab === "references"
+                      ? "bg-white text-primon-950 shadow-sm"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Work Order References
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAmendTab("signatories")}
+                  className={`flex-1 rounded-md py-1.5 font-medium transition-all ${
+                    amendTab === "signatories"
+                      ? "bg-white text-primon-950 shadow-sm"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Signatories
+                </button>
+              </div>
+
+              {/* Tab 1: Shipping Instructions & Cargo */}
+              {amendTab === "shipping" && (
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormRow label="Consignor / Supplier">
+                      <TextInput
+                        value={amendForm.tobaccoSupplier}
+                        onChange={(e) => setAmendForm({ ...amendForm, tobaccoSupplier: e.target.value })}
+                      />
+                    </FormRow>
+                    <FormRow label="Consignor Address">
+                      <TextInput
+                        value={amendForm.supplierAddress}
+                        onChange={(e) => setAmendForm({ ...amendForm, supplierAddress: e.target.value })}
+                      />
+                    </FormRow>
+                    <FormRow label="Consignee">
+                      <TextInput
+                        value={amendForm.consignee}
+                        onChange={(e) => setAmendForm({ ...amendForm, consignee: e.target.value })}
+                      />
+                    </FormRow>
+                    <FormRow label="Consignee Address">
+                      <TextInput
+                        value={amendForm.consigneeAddress}
+                        onChange={(e) => setAmendForm({ ...amendForm, consigneeAddress: e.target.value })}
+                      />
+                    </FormRow>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormRow label="Product Type">
+                      <TextInput
+                        value={amendForm.productType}
+                        onChange={(e) => setAmendForm({ ...amendForm, productType: e.target.value })}
+                        placeholder="e.g. Flue-cured, White Maize"
+                      />
+                    </FormRow>
+                    <FormRow label="Crop Year">
+                      <TextInput
+                        value={amendForm.cropYear}
+                        onChange={(e) => setAmendForm({ ...amendForm, cropYear: e.target.value })}
+                      />
+                    </FormRow>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <FormRow label="Net Weight">
+                      <TextInput
+                        value={amendForm.netWeight}
+                        onChange={(e) => setAmendForm({ ...amendForm, netWeight: e.target.value })}
+                        placeholder="e.g. 126,000 KGS"
+                      />
+                    </FormRow>
+                    <FormRow label="Gross Weight">
+                      <TextInput
+                        value={amendForm.grossWeight}
+                        onChange={(e) => setAmendForm({ ...amendForm, grossWeight: e.target.value })}
+                        placeholder="e.g. 132,000 KGS"
+                      />
+                    </FormRow>
+                    <FormRow label="Quantity (Packages)">
+                      <TextInput
+                        value={amendForm.quantity}
+                        onChange={(e) => setAmendForm({ ...amendForm, quantity: e.target.value })}
+                      />
+                    </FormRow>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <FormRow label="Grade Name">
+                      <TextInput
+                        value={amendForm.gradeName}
+                        onChange={(e) => setAmendForm({ ...amendForm, gradeName: e.target.value })}
+                      />
+                    </FormRow>
+                    <FormRow label="Case Nos.">
+                      <TextInput
+                        value={amendForm.caseNos}
+                        onChange={(e) => setAmendForm({ ...amendForm, caseNos: e.target.value })}
+                      />
+                    </FormRow>
+                    <FormRow label="Polylined">
+                      <Select
+                        value={amendForm.polylined}
+                        onChange={(e) => setAmendForm({ ...amendForm, polylined: e.target.value })}
+                      >
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </Select>
+                    </FormRow>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <FormRow label="Container No.">
+                      <TextInput
+                        value={amendForm.containerNo}
+                        onChange={(e) => setAmendForm({ ...amendForm, containerNo: e.target.value })}
+                        placeholder="e.g. MSKU-9182374"
+                      />
+                    </FormRow>
+                    <FormRow label="Seal No.">
+                      <TextInput
+                        value={amendForm.sealNo}
+                        onChange={(e) => setAmendForm({ ...amendForm, sealNo: e.target.value })}
+                        placeholder="e.g. MLW-849204"
+                      />
+                    </FormRow>
+                    <FormRow label="Country of Origin">
+                      <TextInput
+                        value={amendForm.countryOfOrigin}
+                        onChange={(e) => setAmendForm({ ...amendForm, countryOfOrigin: e.target.value })}
+                      />
+                    </FormRow>
+                  </div>
+
+                  <FormRow label="Additional Information (Acid specifications / special notes)">
+                    <textarea
+                      rows={2}
+                      value={amendForm.additionalInfo}
+                      onChange={(e) => setAmendForm({ ...amendForm, additionalInfo: e.target.value })}
+                      placeholder="e.g. Acid application specifications, chemical treatment notes..."
+                      className="w-full rounded-md border border-border p-2 text-xs text-ink focus:border-primon-500 focus:outline-none"
+                    />
+                  </FormRow>
+                </div>
+              )}
+
+              {/* Tab 2: Work Order References */}
+              {amendTab === "references" && (
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                  <FormRow label="Work Order Code" required>
+                    <TextInput
+                      value={amendForm.code}
+                      onChange={(e) => setAmendForm({ ...amendForm, code: e.target.value })}
+                      placeholder="e.g. NYASA121-25 or WO-2026-0001"
+                      required
+                    />
+                  </FormRow>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormRow label="Commodity / Crop Type">
+                      <Select
+                        value={amendForm.cropType}
+                        onChange={(e) => setAmendForm({ ...amendForm, cropType: e.target.value })}
+                      >
+                        <option value="tobacco">Tobacco</option>
+                        <option value="grain">Grain</option>
+                        <option value="other">Other / Specify</option>
+                      </Select>
+                    </FormRow>
+                    {amendForm.cropType === "other" && (
+                      <FormRow label="Custom Product Name" required>
+                        <TextInput
+                          value={amendForm.customProduct}
+                          onChange={(e) => setAmendForm({ ...amendForm, customProduct: e.target.value })}
+                          placeholder="e.g. Empty Sacks, Timber"
+                          required
+                        />
+                      </FormRow>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <FormRow label="Sales Order No.">
+                      <TextInput
+                        value={amendForm.salesOrderNo}
+                        onChange={(e) => setAmendForm({ ...amendForm, salesOrderNo: e.target.value })}
+                        placeholder="Optional"
+                      />
+                    </FormRow>
+                    <FormRow label="Shipment No.">
+                      <TextInput
+                        value={amendForm.shipmentNo}
+                        onChange={(e) => setAmendForm({ ...amendForm, shipmentNo: e.target.value })}
+                        placeholder="Optional"
+                      />
+                    </FormRow>
+                    <FormRow label="Delivery No.">
+                      <TextInput
+                        value={amendForm.deliveryNo}
+                        onChange={(e) => setAmendForm({ ...amendForm, deliveryNo: e.target.value })}
+                        placeholder="Optional"
+                      />
+                    </FormRow>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Signatories */}
+              {amendTab === "signatories" && (
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                  <FormRow label="Supervising Fumigator">
+                    <TextInput
+                      value={amendForm.supervising_fumigator}
+                      onChange={(e) => setAmendForm({ ...amendForm, supervising_fumigator: e.target.value })}
+                    />
+                  </FormRow>
+                  <FormRow label="For the Supplier">
+                    <TextInput
+                      value={amendForm.supplier_rep}
+                      onChange={(e) => setAmendForm({ ...amendForm, supplier_rep: e.target.value })}
+                    />
+                  </FormRow>
+                  <FormRow label="Certifying Officer">
+                    <TextInput
+                      value={amendForm.certifying_officer}
+                      onChange={(e) => setAmendForm({ ...amendForm, certifying_officer: e.target.value })}
+                    />
+                  </FormRow>
+                </div>
+              )}
+
+              {/* Footer Actions */}
+              <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+                <span className="text-xs text-muted">
+                  Preserves certificate #<strong className="text-ink">{fcc.certificateNumber}</strong>
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setAmendingCert(false)}
+                    disabled={savingAmend}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="brass"
+                    size="sm"
+                    disabled={savingAmend || !amendReason.trim()}
+                  >
+                    {savingAmend ? "Applying amendment…" : "Apply Amendment"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
 
       {/* ── Edit Work Order Modal ── */}
       {editingWo && (
