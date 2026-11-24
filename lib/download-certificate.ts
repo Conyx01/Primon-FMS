@@ -30,7 +30,7 @@ export async function downloadCertificatePdf(element: HTMLElement, filename: str
   const { jsPDF } = await import("jspdf");
 
   const canvas = await html2canvas(element, {
-    scale: 2,
+    scale: 3,
     useCORS: true,
     backgroundColor: "#ffffff",
     logging: false,
@@ -65,6 +65,6 @@ export async function downloadCertificatePdf(element: HTMLElement, filename: str
 
   const x = (pageWidth - width) / 2;
   const y = margin;
-  pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, width, height, undefined, "FAST");
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, width, height, undefined, "MEDIUM");
   pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }

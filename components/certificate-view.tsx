@@ -28,8 +28,8 @@ function val(v: number | null | undefined): string {
 
 function Checkbox({ checked }: { checked: boolean }) {
   return (
-    <span className="mr-1 inline-block h-3.5 w-3.5 rounded-sm border border-current align-middle leading-none">
-      {checked && <span className="block h-full w-full text-center text-[9px] leading-3.5">✓</span>}
+    <span className="mr-1 inline-block h-3.5 w-3.5 rounded-sm border-2 border-black align-middle leading-none bg-white">
+      {checked && <span className="block h-full w-full text-center text-[10px] font-black leading-3 text-black">✓</span>}
     </span>
   );
 }
@@ -47,8 +47,8 @@ function SigBlock({
 }) {
   return (
     <div className="flex min-w-[160px] flex-col gap-1 text-[9px]">
-      <span className="font-bold uppercase tracking-wide">{label}</span>
-      <div className="relative mt-1 h-12 border-b border-black/50">
+      <span className="font-extrabold uppercase tracking-wide text-gray-900">{label}</span>
+      <div className="relative mt-1 h-12 border-b-2 border-black">
         {signatureSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -58,11 +58,11 @@ function SigBlock({
           />
         )}
       </div>
-      <span className="mt-0.5 text-[8px] text-gray-500">Signature</span>
-      <span className="mt-2 font-medium">{name || "—"}</span>
-      <span className="text-[8px] text-gray-500">Printed Name</span>
-      <span className="mt-2">{date || "—"}</span>
-      <span className="text-[8px] text-gray-500">Date</span>
+      <span className="mt-0.5 text-[8px] font-bold uppercase tracking-wider text-gray-800">Signature</span>
+      <span className="mt-2 font-bold text-black">{name || "—"}</span>
+      <span className="text-[8px] font-bold uppercase tracking-wider text-gray-800">Printed Name</span>
+      <span className="mt-2 font-semibold text-black">{date || "—"}</span>
+      <span className="text-[8px] font-bold uppercase tracking-wider text-gray-800">Date</span>
     </div>
   );
 }
@@ -157,10 +157,10 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
 
           {/* Right: title + meta */}
           <div className="flex flex-col items-end gap-1 text-right">
-            <h1 className="text-[13px] font-extrabold uppercase tracking-widest text-primon-900">
+            <h1 className="text-[13px] font-extrabold uppercase tracking-widest text-primon-950">
               Fumigation Conformance Certificate
             </h1>
-            <p className="text-[8px] font-medium text-gray-500 uppercase tracking-wide">
+            <p className="text-[8.5px] font-bold text-gray-800 uppercase tracking-wide">
               {wo.cropType === "tobacco"
                 ? "Tobacco"
                 : wo.cropType === "grain"
@@ -169,27 +169,27 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               Fumigation
             </p>
             {wo.certificateNumber && (
-              <p className="mt-1 rounded bg-primon-800 px-2 py-0.5 text-[9px] font-bold text-white tracking-widest">
+              <p className="mt-1 rounded bg-primon-900 px-2 py-0.5 text-[9.5px] font-extrabold text-white tracking-widest">
                 {wo.certificateNumber}
               </p>
             )}
             <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[8.5px]">
               {wo.salesOrderNo && (
                 <>
-                  <span className="font-semibold text-gray-500">Sales Order No.:</span>
-                  <span>{wo.salesOrderNo}</span>
+                  <span className="font-bold text-gray-900">Sales Order No.:</span>
+                  <span className="font-semibold text-black">{wo.salesOrderNo}</span>
                 </>
               )}
               {wo.shipmentNo && (
                 <>
-                  <span className="font-semibold text-gray-500">Shipment No.:</span>
-                  <span>{wo.shipmentNo}</span>
+                  <span className="font-bold text-gray-900">Shipment No.:</span>
+                  <span className="font-semibold text-black">{wo.shipmentNo}</span>
                 </>
               )}
               {wo.deliveryNo && (
                 <>
-                  <span className="font-semibold text-gray-500">Delivery No.:</span>
-                  <span>{wo.deliveryNo}</span>
+                  <span className="font-bold text-gray-900">Delivery No.:</span>
+                  <span className="font-semibold text-black">{wo.deliveryNo}</span>
                 </>
               )}
             </div>
@@ -200,7 +200,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
       {/* ── SECTION 1: PARTIES ── */}
       <section className="px-8 pt-3 pb-2">
         <SectionTitle>1. Supplier, Consignee &amp; Contractor</SectionTitle>
-        <table className="w-full border-collapse text-[9px]">
+        <table className="w-full border-collapse text-[9px] border-2 border-gray-400 bg-white">
           <tbody>
             <PartyRow
               label={
@@ -238,8 +238,8 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               : `${titleCase(wo.customProduct || "Product")} Description`}
         </SectionTitle>
         {Boolean(si.additionalInfo?.trim()) ? (
-          <div className="flex border border-gray-300 text-[9px]">
-            <div className="grid flex-1 grid-cols-4 gap-x-3 gap-y-1 p-2 border-r border-gray-300">
+          <div className="flex border-2 border-gray-400 text-[9px] bg-white">
+            <div className="grid flex-1 grid-cols-4 gap-x-3 gap-y-1 p-2 border-r-2 border-gray-400">
               <Field
                 label={
                   wo.cropType === "tobacco"
@@ -261,17 +261,17 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               <Field label="Container No." value={si.containerNo || "—"} />
               <Field label="Seal No." value={si.sealNo || "—"} className="col-span-2" />
             </div>
-            <div className="w-[28%] min-w-[180px] bg-gray-50/50 p-2 flex flex-col justify-start">
-              <span className="block text-[7.5px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+            <div className="w-[28%] min-w-[180px] bg-white p-2 flex flex-col justify-start">
+              <span className="block text-[8px] font-extrabold uppercase tracking-wide text-gray-900 mb-1 border-b border-gray-300 pb-0.5">
                 Additional Information
               </span>
-              <p className="whitespace-pre-line text-[8.5px] leading-tight text-gray-800 font-medium">
+              <p className="whitespace-pre-line text-[8.5px] leading-snug text-black font-semibold">
                 {si.additionalInfo?.trim()}
               </p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-x-4 gap-y-1 border border-gray-300 p-2 text-[9px]">
+          <div className="grid grid-cols-4 gap-x-4 gap-y-1 border-2 border-gray-400 p-2 text-[9px] bg-white">
             <Field
               label={
                 wo.cropType === "tobacco"
@@ -299,12 +299,12 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
       {/* ── SECTION 3: FUMIGATION DESCRIPTION ── */}
       <section className="px-8 pt-2 pb-2">
         <SectionTitle>3. Fumigation Description</SectionTitle>
-        <div className="grid grid-cols-2 gap-x-6 border border-gray-300 p-2 text-[9px]">
+        <div className="grid grid-cols-2 gap-x-6 border-2 border-gray-400 p-2 text-[9px] bg-white">
           {/* Left column */}
           <div className="flex flex-col gap-1.5">
             <div>
-              <span className="font-semibold text-gray-500 uppercase text-[8px]">Type</span>
-              <div className="mt-0.5 flex gap-4">
+              <span className="font-extrabold text-gray-900 uppercase text-[8px]">Type</span>
+              <div className="mt-0.5 flex gap-4 text-black font-bold">
                 <label className="flex items-center gap-1">
                   <Checkbox checked={isContainer} />
                   Container
@@ -316,8 +316,8 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
               </div>
             </div>
             <div>
-              <span className="font-semibold text-gray-500 uppercase text-[8px]">Formulation</span>
-              <div className="mt-0.5 flex gap-4">
+              <span className="font-extrabold text-gray-900 uppercase text-[8px]">Formulation</span>
+              <div className="mt-0.5 flex gap-4 text-black font-bold">
                 <label className="flex items-center gap-1">
                   <Checkbox checked={isPlate} />
                   Plate
@@ -348,7 +348,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
         <SectionTitle>4. Fumigation Data</SectionTitle>
 
         {/* Dates row */}
-        <div className="mb-1.5 grid grid-cols-3 gap-x-4 border border-gray-300 px-2 py-1 text-[9px]">
+        <div className="mb-1.5 grid grid-cols-3 gap-x-4 border-2 border-gray-400 px-2 py-1 text-[9px] bg-white">
           <Field label="Date Fumigant Placed" value={fmt(wo.datePlaced)} />
           <Field label="Aeration Began" value={fmt(wo.aerationBegan)} />
           <Field label="Aeration Completed" value={fmt(wo.aerationCompleted)} />
@@ -359,20 +359,20 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
           <table className="w-full border-collapse text-[8.5px]">
             <thead>
               <tr>
-                <th className="w-[120px] border border-gray-400 bg-gray-100 px-1.5 py-1 text-left font-semibold text-gray-700">
+                <th className="w-[120px] border border-gray-500 bg-slate-100 px-1.5 py-1 text-left font-extrabold text-gray-900">
                   Parameter
                 </th>
                 {DAY_COLS.map((c) => (
                   <th
                     key={c.day}
-                    className="border border-gray-400 bg-gray-100 px-1 py-1 text-center font-semibold text-gray-700 whitespace-pre-line"
+                    className="border border-gray-500 bg-slate-100 px-1 py-1 text-center font-extrabold text-gray-900 whitespace-pre-line"
                   >
                     {c.label}
                   </th>
                 ))}
               </tr>
               <tr>
-                <th className="border border-gray-400 bg-gray-50 px-1.5 py-0.5 text-left text-[7.5px] font-medium text-gray-500">
+                <th className="border border-gray-500 bg-slate-50 px-1.5 py-0.5 text-left text-[7.5px] font-bold text-gray-900">
                   Date
                 </th>
                 {DAY_COLS.map((c) => {
@@ -380,7 +380,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
                   return (
                     <td
                       key={c.day}
-                      className="border border-gray-400 bg-gray-50 px-1 py-0.5 text-center text-[7.5px] text-gray-600"
+                      className="border border-gray-500 bg-slate-50 px-1 py-0.5 text-center text-[7.5px] font-bold text-black"
                     >
                       {r ? fmt(r.date) : "—"}
                     </td>
@@ -430,10 +430,10 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
             </tbody>
           </table>
         </div>
-        <p className="mt-0.5 text-[7.5px] text-gray-400 italic">
+        <p className="mt-0.5 text-[7.5px] text-gray-700 font-semibold italic">
           * Ambient temperature must be recorded for all days. Product temperature is recorded on Day 0 (pre-fumigation check) only.
         </p>
-        <div className="mt-1.5 grid grid-cols-2 gap-x-4 border border-gray-300 px-2 py-1 text-[9px]">
+        <div className="mt-1.5 grid grid-cols-2 gap-x-4 border-2 border-gray-400 px-2 py-1 text-[9px] bg-white">
           <Field
             label="Hours under aeration"
             value={wo.durationHours != null ? `${wo.durationHours} hrs` : "48 hrs"}
@@ -446,11 +446,11 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
 
         {/* Remarks — only rendered when text is present */}
         {wo.remarks && (
-          <div className="mt-1.5 border border-gray-300 px-2 py-1 text-[9px]">
-            <span className="block text-[8px] font-semibold uppercase tracking-wide text-gray-500">
+          <div className="mt-1.5 border-2 border-gray-400 px-2 py-1 text-[9px] bg-white">
+            <span className="block text-[8px] font-extrabold uppercase tracking-wide text-gray-900">
               Remarks
             </span>
-            <p className="mt-0.5 leading-[1.5] text-gray-800 whitespace-pre-wrap">{wo.remarks}</p>
+            <p className="mt-0.5 leading-[1.4] text-black font-semibold whitespace-pre-wrap">{wo.remarks}</p>
           </div>
         )}
       </section>
@@ -458,7 +458,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
       {/* ── SECTION 5: CERTIFICATION ── */}
       <section className="px-8 pt-2 pb-3">
         <SectionTitle>5. Certification</SectionTitle>
-        <div className="border border-gray-300 p-3 text-[8.5px] leading-5">
+        <div className="border-2 border-gray-400 p-3 text-[8.5px] leading-relaxed text-black bg-white">
           <p>
             This is to certify that the above-described commodity was fumigated with phosphine gas
             (Magnesium or Aluminium Phosphide) in compliance with the recommendations and guidelines
@@ -475,7 +475,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
             purposes of phytosanitary compliance, export clearance, and trade documentation.
           </p>
           {wo.certificateNumber && (
-            <p className="mt-2 font-semibold">
+            <p className="mt-2 font-bold text-primon-950">
               Certificate No.: {wo.certificateNumber} &nbsp;|&nbsp; Date Certified: {certDate}
             </p>
           )}
@@ -509,9 +509,9 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
                 alt="Verification QR"
                 width={80}
                 height={80}
-                className="rounded border border-gray-200"
+                className="rounded border border-gray-400"
               />
-              <span className="text-[7px] text-gray-400 text-center">
+              <span className="text-[7.5px] font-bold text-gray-800 text-center">
                 Scan to verify
               </span>
             </div>
@@ -520,7 +520,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="border-t border-gray-200 px-8 py-1.5 text-center text-[7.5px] text-gray-300">
+      <footer className="border-t border-gray-300 px-8 py-1.5 text-center text-[8px] font-bold text-gray-600">
         www.primonenterprises.com
       </footer>
     </article>
@@ -531,7 +531,7 @@ export const CertificateView = forwardRef<HTMLElement, Props>(function Certifica
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-1 text-[9px] font-bold uppercase tracking-wide text-primon-800 border-b border-primon-200 pb-0.5">
+    <h2 className="mb-1 text-[9.5px] font-extrabold uppercase tracking-wide text-primon-950 border-b-2 border-primon-800 pb-0.5">
       {children}
     </h2>
   );
@@ -548,14 +548,14 @@ function PartyRow({
 }) {
   return (
     <tr>
-      <td className="w-[140px] border border-gray-300 bg-gray-50 px-2 py-1 font-bold uppercase text-[8px] text-gray-600 align-top">
+      <td className="w-[140px] border border-gray-500 bg-slate-100 px-2 py-1 font-extrabold uppercase text-[8px] text-gray-900 align-top">
         {label}
       </td>
-      <td className="border border-gray-300 px-2 py-1 font-medium align-top">{name}</td>
-      <td className="w-[30px] border border-gray-300 bg-gray-50 px-2 py-1 font-bold uppercase text-[8px] text-gray-600 align-top">
+      <td className="border border-gray-500 px-2 py-1 font-bold text-black align-top">{name}</td>
+      <td className="w-[30px] border border-gray-500 bg-slate-100 px-2 py-1 font-extrabold uppercase text-[8px] text-gray-900 align-top">
         Address
       </td>
-      <td className="border border-gray-300 px-2 py-1 align-top whitespace-pre-line">{address}</td>
+      <td className="border border-gray-500 px-2 py-1 font-semibold text-black align-top whitespace-pre-line">{address}</td>
     </tr>
   );
 }
@@ -571,10 +571,10 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <span className="block text-[7.5px] font-semibold uppercase tracking-wide text-gray-500">
+      <span className="block text-[8px] font-extrabold uppercase tracking-wide text-gray-900">
         {label}
       </span>
-      <span className="block font-medium">{value}</span>
+      <span className="block font-bold text-black">{value}</span>
     </div>
   );
 }
@@ -592,7 +592,7 @@ function ReadingRow({
 }) {
   return (
     <tr>
-      <td className="border border-gray-400 bg-gray-50 px-1.5 py-1 font-semibold text-gray-700">
+      <td className="border border-gray-500 bg-slate-100 px-1.5 py-1 font-bold text-gray-900">
         {label}
       </td>
       {DAY_COLS.map((c) => {
@@ -602,8 +602,8 @@ function ReadingRow({
         return (
           <td
             key={c.day}
-            className={`border border-gray-400 px-1 py-1 text-center ${
-              hl ? "bg-red-50 font-bold text-red-700" : ""
+            className={`border border-gray-500 px-1 py-1 text-center font-bold text-black ${
+              hl ? "bg-red-50 font-black text-red-700" : ""
             }`}
           >
             {v}
