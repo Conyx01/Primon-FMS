@@ -45,8 +45,8 @@ const emptySi: ShippingInstructions = {
   gradeName: "",
   caseNos: "",
   countryOfOrigin: "Malawi",
-  location: "",
-  warehouseSection: "",
+  containerNo: "",
+  sealNo: "",
   complete: false,
 };
 
@@ -391,9 +391,8 @@ function NewWorkOrderWizard() {
             gradeName: siRow.gradeName ?? "",
             caseNos: siRow.caseNos ?? "",
             countryOfOrigin: siRow.countryOfOrigin ?? "Malawi",
-            location: siRow.location ?? "",
-            warehouseSection: siRow.warehouseSection ?? "",
-            complete: Boolean(siRow.tobaccoSupplier && siRow.consignee),
+            containerNo: siRow.containerNo ?? "",
+            sealNo: siRow.sealNo ?? "",            complete: Boolean(siRow.tobaccoSupplier && siRow.consignee),
           });
         }
 
@@ -919,11 +918,11 @@ function NewWorkOrderWizard() {
                     <option value="No">No</option>
                   </Select>
                 </FormRow>
-                <FormRow label="Location">
-                  <TextInput value={si.location} onChange={(e) => setSi({ ...si, location: e.target.value })} />
+                <FormRow label="Container #">
+                  <TextInput placeholder="e.g. MSCU1234567" value={si.containerNo ?? ""} onChange={(e) => setSi({ ...si, containerNo: e.target.value })} />
                 </FormRow>
-                <FormRow label="Warehouse section">
-                  <TextInput value={si.warehouseSection} onChange={(e) => setSi({ ...si, warehouseSection: e.target.value })} />
+                <FormRow label="Seal #">
+                  <TextInput placeholder="e.g. ML123456" value={si.sealNo ?? ""} onChange={(e) => setSi({ ...si, sealNo: e.target.value })} />
                 </FormRow>
               </div>
             </div>

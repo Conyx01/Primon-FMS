@@ -34,8 +34,8 @@ export interface ShippingInstructions {
   cigaretteBeetle?: "Yes" | "No" | "N/A";
   tobaccoMoth?: "Yes" | "No" | "N/A";
   wetDeactivated?: boolean;
-  location: string;
-  warehouseSection: string;
+  location?: string;
+  warehouseSection?: string;
   complete: boolean;
   locked?: boolean;
 }

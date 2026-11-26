@@ -107,39 +107,49 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
     >
       {/* ── HEADER ── */}
       <div className="relative mb-3 pt-1 pb-2">
-        <div className="text-center">
-          <h1 className="text-[13px] font-black uppercase tracking-wide text-black">
-            PMI-DESTINED TOBACCO FUMIGATION
-          </h1>
-          <p className="text-[9px] text-gray-800 mt-0.5">
-            (via Standard Operating Procedure - SOP, PME Method # 751)
-          </p>
-          <div className="mt-2 text-[10px] font-bold">
-            <span>CERTIFICATE NO. &nbsp;</span>
-            <span className="border-b-2 border-black px-3 py-0.5 tracking-wider">
-              {certNumberDisplay}
-            </span>
-          </div>
-        </div>
-
-        {/* Right Logo: Philip Morris Crest or Primon Logo */}
-        <div className="absolute right-0 top-0 flex items-center justify-end h-16 w-32">
-          {variant === "pmi_crest" ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src="/pmi-logo.png"
-              alt="Philip Morris International"
-              className="h-12 w-auto object-contain"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
+        {variant === "pmi_crest" ? (
+          <>
+            {/* PMI Crest variant: bold title centred, PMI SVG top-right */}
+            <div className="text-center">
+              <h1 className="text-[13px] font-black uppercase tracking-wide text-black">
+                PMI-DESTINED TOBACCO FUMIGATION
+              </h1>
+              <p className="text-[9px] text-gray-800 mt-0.5">
+                (via Standard Operating Procedure - SOP, PME Method # 751)
+              </p>
+              <div className="mt-2 text-[10px] font-bold">
+                <span>CERTIFICATE NO. &nbsp;</span>
+                <span className="border-b-2 border-black px-3 py-0.5 tracking-wider">
+                  {certNumberDisplay}
+                </span>
+              </div>
+            </div>
+            <div className="absolute right-0 top-0 flex items-center justify-end h-16 w-32">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/pmi-logo.svg"
+                alt="Philip Morris International"
+                className="h-12 w-auto object-contain"
+              />
+            </div>
+          </>
+        ) : (
+          /* Primon Logo variant: Primon logo centred, no right-side logo */
+          <div className="flex flex-col items-center gap-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo-no-bg.png"
               alt="Primon Enterprises Limited"
-              className="h-12 w-auto object-contain"
+              className="h-14 w-auto object-contain"
             />
-          )}
-        </div>
+            <div className="mt-1 text-[10px] font-bold">
+              <span>CERTIFICATE NO. &nbsp;</span>
+              <span className="border-b-2 border-black px-3 py-0.5 tracking-wider">
+                {certNumberDisplay}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── TABLE 1: PARTIES ── */}
@@ -459,11 +469,8 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
               </td>
             </tr>
             <tr>
-              <td className="border border-black p-1 text-left font-bold">
-                Aeration Phosphine conc. (ppm)
-              </td>
-              <td className="border border-black p-1 text-left font-bold">
-                Airspace (surrounding) Tobacco Case/Bale-until 0.1ppm
+              <td className="border border-black p-1 text-left font-bold" colSpan={2}>
+                Aeration Phosphine conc. (ppm) — Airspace (surrounding) Tobacco Case/Bale (until 0.1ppm)
               </td>
               <td className="border border-black p-0.5 font-bold">{cellReading(1, "probeCase")}</td>
               <td className="border border-black p-0.5 font-bold">{cellReading(2, "probeCase")}</td>
@@ -495,49 +502,63 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           (Attesting the information above is correct, that the fumigation practices adhered to the consignees instructions and that all fumigant residues were removed from the consignment).
         </p>
 
-        <div className="flex items-center justify-between gap-6 pt-1">
+        <div className="flex items-stretch justify-between gap-6 pt-1">
           {/* Supervising Fumigator */}
-          <div className="flex-1 space-y-1">
+          <div className="flex-1 space-y-2">
+            {/* Name row */}
             <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap">Supervising Fumigator: Name:</span>
-              <span className="border-b border-black font-bold flex-1 px-1">
+              <span className="font-bold whitespace-nowrap text-[8px]">Supervising Fumigator:</span>
+              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
                 {sigFum?.signerName || "Prince Chiwalo"}
               </span>
             </div>
+            {/* Signature row — dedicated height for sig image */}
             <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap">Signature:</span>
-              <div className="relative border-b border-black flex-1 h-8">
+              <span className="font-bold whitespace-nowrap text-[8px]">Signature:</span>
+              <div className="relative border-b border-black flex-1 h-9">
                 {showPrinceSignature && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src="/signature.png"
                     alt="Signature"
-                    className="absolute bottom-0 left-2 h-8 w-auto object-contain"
+                    className="absolute bottom-0.5 left-2 h-8 w-auto object-contain"
                   />
                 )}
               </div>
-              <span className="font-bold ml-2">Date:</span>
-              <span className="border-b border-black font-bold px-2">{certDate}</span>
+            </div>
+            {/* Date row — its own line, no crowding */}
+            <div className="flex items-end gap-2">
+              <span className="font-bold whitespace-nowrap text-[8px]">Date:</span>
+              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
+                {certDate}
+              </span>
             </div>
           </div>
 
           {/* For the Supplier */}
-          <div className="flex-1 space-y-1">
+          <div className="flex-1 space-y-2">
+            {/* Name row */}
             <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap">For the Supplier: Name:</span>
-              <span className="border-b border-black font-bold flex-1 px-1">
+              <span className="font-bold whitespace-nowrap text-[8px]">For the Supplier:</span>
+              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
                 {sigSup?.signerName || "—"}
               </span>
             </div>
+            {/* Signature row */}
             <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap">Signature:</span>
-              <div className="border-b border-black flex-1 h-8"></div>
-              <span className="font-bold ml-2">Date:</span>
-              <span className="border-b border-black font-bold px-2">{certDate}</span>
+              <span className="font-bold whitespace-nowrap text-[8px]">Signature:</span>
+              <div className="border-b border-black flex-1 h-9"></div>
+            </div>
+            {/* Date row */}
+            <div className="flex items-end gap-2">
+              <span className="font-bold whitespace-nowrap text-[8px]">Date:</span>
+              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
+                {certDate}
+              </span>
             </div>
           </div>
 
-          {/* Verification QR Code (Minted & displayed upon certification) */}
+          {/* Verification QR Code — displayed upon certification */}
           {certified && wo.verificationUrl && (
             <div className="flex flex-col items-center justify-center shrink-0 pl-3 border-l-2 border-black">
               {/* eslint-disable-next-line @next/next/no-img-element */}
