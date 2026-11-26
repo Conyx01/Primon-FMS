@@ -23,8 +23,8 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
   const [saved, setSaved] = useState(false);
   const isPmi =
     si.certificateTemplate === "pmi" ||
-    /philip\s*morris|pmi/i.test(si.consignee || "") ||
-    /philip\s*morris|pmi/i.test(si.consigneeAddress || "");
+    /phil+ip\s*morris|pmi/i.test(si.consignee || "") ||
+    /phil+ip\s*morris|pmi/i.test(si.consigneeAddress || "");
 
   const hasExistingSi = Boolean(
     initial.tobaccoSupplier?.trim() || initial.consignee?.trim() || initial.complete

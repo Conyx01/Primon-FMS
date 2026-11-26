@@ -8,14 +8,22 @@ function isPmiTemplate(si: {
 }): boolean {
   return Boolean(
     si.certificateTemplate === "pmi" ||
-      /philip\s*morris|pmi/i.test(si.consignee || "") ||
-      /philip\s*morris|pmi/i.test(si.consigneeAddress || "")
+      /phil+ip\s*morris|pmi/i.test(si.consignee || "") ||
+      /phil+ip\s*morris|pmi/i.test(si.consigneeAddress || "")
   );
 }
 
 describe("PMI Template Detection & Filename Generation", () => {
   it("detects PMI when certificateTemplate is explicitly 'pmi'", () => {
     expect(isPmiTemplate({ certificateTemplate: "pmi" })).toBe(true);
+  });
+
+  it("auto-detects PMI when consignee is Phillip Morris with double l", () => {
+    expect(
+      isPmiTemplate({
+        consignee: "Phillip Morris",
+      })
+    ).toBe(true);
   });
 
   it("auto-detects PMI when consignee is Philip Morris International", () => {

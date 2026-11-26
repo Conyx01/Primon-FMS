@@ -30,8 +30,8 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
     setWo(mapped);
     const isPmi =
       mapped.si.certificateTemplate === "pmi" ||
-      /philip\s*morris|pmi/i.test(mapped.si.consignee || "") ||
-      /philip\s*morris|pmi/i.test(mapped.si.consigneeAddress || "");
+      /phil+ip\s*morris|pmi/i.test(mapped.si.consignee || "") ||
+      /phil+ip\s*morris|pmi/i.test(mapped.si.consigneeAddress || "");
     if (isPmi) {
       setSelectedTemplate("pmi_crest");
     }
@@ -77,8 +77,8 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
 
   const isPmiJob = Boolean(
     wo.si.certificateTemplate === "pmi" ||
-      /philip\s*morris|pmi/i.test(wo.si.consignee || "") ||
-      /philip\s*morris|pmi/i.test(wo.si.consigneeAddress || "")
+      /phil+ip\s*morris|pmi/i.test(wo.si.consignee || "") ||
+      /phil+ip\s*morris|pmi/i.test(wo.si.consigneeAddress || "")
   );
 
   return (

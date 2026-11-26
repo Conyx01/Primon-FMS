@@ -146,8 +146,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
       <table className="w-full border-collapse border-2 border-black text-[8.5px] mb-2">
         <thead>
           <tr className="bg-slate-100">
-            <th className="w-[30%] border border-black px-2 py-1 text-center font-bold">NAME</th>
-            <th className="border border-black px-2 py-1 text-center font-bold">ADDRESSE</th>
+            <th className="w-[28%] border border-black">&nbsp;</th>
+            <th className="w-[44%] border border-black px-2 py-1 text-center font-bold">NAME</th>
+            <th className="w-[28%] border border-black px-2 py-1 text-center font-bold">ADDRESSE</th>
           </tr>
         </thead>
         <tbody>
