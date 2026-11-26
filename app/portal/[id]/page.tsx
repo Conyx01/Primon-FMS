@@ -164,6 +164,7 @@ export default function PortalWorkOrderPage({ params }: { params: { id: string }
           workOrderId={wo.id}
           initial={wo.si}
           onSaved={(si) => setWo({ ...wo, si })}
+          isInternal={false}
         />
 
         <div className="mt-8">

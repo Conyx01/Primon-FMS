@@ -1046,6 +1046,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             onSaved={() => {
               void load();
             }}
+            isInternal={true}
           />
         </div>
 

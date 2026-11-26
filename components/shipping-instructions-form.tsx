@@ -10,9 +10,13 @@ type Props = {
   workOrderId: string;
   initial: ShippingInstructions;
   onSaved?: (next: ShippingInstructions) => void;
+  /** True in internal Primon dashboard; false (default) in client portal.
+   *  Controls visibility of the manual "Designate as PMI" override button.
+   *  Auto-detection from the Consignee field works in both contexts. */
+  isInternal?: boolean;
 };
 
-export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Props) {
+export function ShippingInstructionsForm({ workOrderId, initial, onSaved, isInternal = false }: Props) {
   const locked = Boolean(initial.locked);
   const [si, setSi] = useState<ShippingInstructions>(initial);
   const [showAdditionalInfo, setShowAdditionalInfo] = useState(
@@ -314,7 +318,7 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
           </div>
         </div>
       ) : (
-        !locked && (
+        !locked && isInternal && (
           <div className="mt-4 border-t border-dashed border-border pt-3">
             <button
               type="button"
