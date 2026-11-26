@@ -26,9 +26,27 @@ function val(v: number | null | undefined): string {
 
 function Checkmark({ checked }: { checked: boolean }) {
   return checked ? (
-    <span className="font-bold underline decoration-2 underline-offset-2 mx-1">X</span>
+    <span className="inline-block border-b-2 border-black font-black pb-[1px] px-0.5 leading-none mx-1 text-center min-w-[14px]">
+      X
+    </span>
   ) : (
     <span className="inline-block w-4 border-b border-black text-center mx-1">&nbsp;</span>
+  );
+}
+
+function UnderlineVal({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`inline-block border-b border-black font-bold pb-[1px] px-1 leading-none ${className}`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -119,7 +137,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
               </p>
               <div className="mt-2 text-[10px] font-bold">
                 <span>CERTIFICATE NO. &nbsp;</span>
-                <span className="border-b-2 border-black px-3 py-0.5 tracking-wider">
+                <span className="inline-block border-b-2 border-black px-3 pb-0.5 tracking-wider font-extrabold">
                   {certNumberDisplay}
                 </span>
               </div>
@@ -144,7 +162,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             />
             <div className="mt-1 text-[10px] font-bold">
               <span>CERTIFICATE NO. &nbsp;</span>
-              <span className="border-b-2 border-black px-3 py-0.5 tracking-wider">
+              <span className="inline-block border-b-2 border-black px-3 pb-0.5 tracking-wider font-extrabold">
                 {certNumberDisplay}
               </span>
             </div>
@@ -203,7 +221,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
 
       {/* ── SECTION 2: TOBACCO DESCRIPTION ── */}
       <div className="border-2 border-black p-2 mb-2">
-        <h2 className="text-[10px] font-black underline mb-1">Tobacco Description</h2>
+        <h2 className="text-[10px] font-black inline-block border-b border-black pb-0.5 mb-1">
+          Tobacco Description
+        </h2>
         <div className="grid grid-cols-[1fr_auto] gap-x-6">
           {/* Left Grid */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -277,16 +297,18 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           <span className="font-bold">
             Tobacco temperature (Centre of case/bale) recorded prior fumigation: &nbsp;
           </span>
-          <span className="font-bold underline">
+          <UnderlineVal>
             {day0ProductTemp != null ? day0ProductTemp : "—"}
-          </span>
+          </UnderlineVal>
           <span className="font-bold"> &nbsp;°C</span>
         </div>
       </div>
 
       {/* ── SECTION 3: FUMIGATION DESCRIPTION ── */}
       <div className="border-2 border-black p-2 mb-2 space-y-1">
-        <h2 className="text-[10px] font-black underline">Fumigation Description</h2>
+        <h2 className="text-[10px] font-black inline-block border-b border-black pb-0.5">
+          Fumigation Description
+        </h2>
         <div>
           <span className="font-bold">Enclosure type: &nbsp;</span>
           <span>Container <Checkmark checked={isContainer} /></span>
@@ -315,26 +337,26 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
         <div className="flex flex-wrap gap-x-6">
           <div>
             <span className="font-bold">Total Volume Fumigated (m³): </span>
-            <span className="underline">{val(fum.totalVolume)}</span>
+            <UnderlineVal>{val(fum.totalVolume)}</UnderlineVal>
           </div>
           <div>
             <span className="font-bold">Dose PH3(g/m³): </span>
-            <span className="underline">{val(fum.dose)}</span>
+            <UnderlineVal>{val(fum.dose)}</UnderlineVal>
           </div>
           <div>
             <span className="font-bold">Total Fumigant used (g): </span>
-            <span className="underline">{val(fum.totalFumigantUsed)}</span>
+            <UnderlineVal>{val(fum.totalFumigantUsed)}</UnderlineVal>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-x-8">
           <div>
             <span className="font-bold">Total hours under gas: </span>
-            <span className="underline">144</span>
+            <UnderlineVal>144</UnderlineVal>
           </div>
           <div>
             <span className="font-bold">Total Hours of Aeration: </span>
-            <span className="underline">{wo.durationHours != null ? wo.durationHours : "48"}</span>
+            <UnderlineVal>{wo.durationHours != null ? wo.durationHours : "48"}</UnderlineVal>
           </div>
           <div>
             <span className="font-bold">Fumigant wet deactivated: &nbsp;</span>
@@ -346,15 +368,15 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
         <div className="flex flex-wrap gap-x-4">
           <div>
             <span className="font-bold">Dates/Times: Fumigant placed: </span>
-            <span className="underline">{fmt(wo.datePlaced)}</span>
+            <UnderlineVal>{fmt(wo.datePlaced)}</UnderlineVal>
           </div>
           <div>
             <span className="font-bold">Aeration begun: </span>
-            <span className="underline">{fmt(wo.aerationBegan)}</span>
+            <UnderlineVal>{fmt(wo.aerationBegan)}</UnderlineVal>
           </div>
           <div>
             <span className="font-bold">Aeration completed: </span>
-            <span className="underline">{fmt(wo.aerationCompleted)}</span>
+            <UnderlineVal>{fmt(wo.aerationCompleted)}</UnderlineVal>
           </div>
         </div>
 
@@ -362,49 +384,51 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           <span className="font-bold">
             Minimum ambient (surrounding) temperature recorded during fumigation: &nbsp;
           </span>
-          <span className="underline font-bold">
+          <UnderlineVal>
             {minAmbientTemp != null ? minAmbientTemp : "—"}
-          </span>
+          </UnderlineVal>
           <span className="font-bold"> &nbsp;°C</span>
         </div>
       </div>
 
       {/* ── SECTION 4: FUMIGATION DATA & REFERENCE TABLE ── */}
       <div className="border-2 border-black p-2 mb-2">
-        <h2 className="text-[10px] font-black underline mb-1">Fumigation data</h2>
+        <h2 className="text-[10px] font-black inline-block border-b border-black pb-0.5 mb-1">
+          Fumigation data
+        </h2>
 
         {/* Reference Table */}
         <table className="w-full border-collapse border border-black text-[8px] mb-1.5 text-center">
           <thead>
             <tr className="bg-slate-100 font-bold">
-              <th className="border border-black p-0.5">Tobacco Pest</th>
-              <th className="border border-black p-0.5">Tobacco Temprature (oC)</th>
-              <th className="border border-black p-0.5">Phosphine Conc. (ppm)</th>
-              <th className="border border-black p-0.5">Min. exposure-time (days)</th>
+              <th className="border border-black py-1 px-1 align-middle leading-normal">Tobacco Pest</th>
+              <th className="border border-black py-1 px-1 align-middle leading-normal">Tobacco Temprature (oC)</th>
+              <th className="border border-black py-1 px-1 align-middle leading-normal">Phosphine Conc. (ppm)</th>
+              <th className="border border-black py-1 px-1 align-middle leading-normal">Min. exposure-time (days)</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td rowSpan={4} className="border border-black p-0.5 font-bold align-middle">
+              <td rowSpan={4} className="border border-black py-1 px-1 font-bold align-middle leading-normal">
                 Cigarette beetle
               </td>
-              <td className="border border-black p-0.5">16 - 20</td>
-              <td className="border border-black p-0.5">300</td>
-              <td className="border border-black p-0.5">2</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">16 - 20</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">300</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">2</td>
             </tr>
             <tr>
-              <td rowSpan={2} className="border border-black p-0.5 align-middle">20 - 25</td>
-              <td className="border border-black p-0.5">300-700</td>
-              <td className="border border-black p-0.5">12</td>
+              <td rowSpan={2} className="border border-black py-1 px-1 align-middle leading-normal">20 - 25</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">300-700</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">12</td>
             </tr>
             <tr>
-              <td className="border border-black p-0.5">&gt;700</td>
-              <td className="border border-black p-0.5">10</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">&gt;700</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">10</td>
             </tr>
             <tr>
-              <td className="border border-black p-0.5">&gt;25</td>
-              <td className="border border-black p-0.5">300 - 600<br />&gt;600</td>
-              <td className="border border-black p-0.5">12<br />6</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">&gt;25</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">300 - 600<br />&gt;600</td>
+              <td className="border border-black py-1 px-1 align-middle leading-normal">12<br />6</td>
             </tr>
           </tbody>
         </table>
@@ -422,64 +446,64 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
         <table className="w-full border-collapse border-2 border-black text-[8px] text-center">
           <thead>
             <tr className="bg-slate-100">
-              <th className="border border-black p-1 text-left w-[26%] font-bold">
+              <th className="border border-black py-1 px-1.5 text-left w-[26%] font-bold align-middle leading-normal">
                 Time after fumigant Placement (hours)
               </th>
-              <th className="border border-black p-0.5 w-[7%]">indicative</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">24</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">48</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">72</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">96</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">120</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">144</th>
-              <th className="border border-black p-0.5 w-[8%] font-bold">168</th>
-              <th className="border border-black p-0.5 w-[11%] font-bold bg-slate-50">End of Aeration</th>
+              <th className="border border-black py-1 px-0.5 w-[7%] align-middle leading-normal">indicative</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">24</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">48</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">72</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">96</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">120</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">144</th>
+              <th className="border border-black py-1 px-0.5 w-[8%] font-bold align-middle leading-normal">168</th>
+              <th className="border border-black py-1 px-0.5 w-[11%] font-bold bg-slate-50 align-middle leading-normal">End of Aeration</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="border border-black p-1 text-left font-bold" rowSpan={2}>
+              <td className="border border-black py-1 px-1 text-left font-bold align-middle leading-normal" rowSpan={2}>
                 Fumigation Phosphine Conc. (ppm)
               </td>
-              <td className="border border-black p-0.5 font-medium">actual</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5">&nbsp;</td>
-              <td className="border border-black p-0.5 bg-slate-50 font-bold">
+              <td className="border border-black py-1 px-0.5 font-medium align-middle leading-normal">actual</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 align-middle leading-normal">&nbsp;</td>
+              <td className="border border-black py-1 px-0.5 bg-slate-50 font-bold align-middle leading-normal">
                 {wo.clearanceGasPpm != null ? wo.clearanceGasPpm : "0.01"}
               </td>
             </tr>
             <tr>
-              <td className="border border-black p-1 text-left font-bold" colSpan={1}>
+              <td className="border border-black py-1 px-1 text-left font-bold align-middle leading-normal" colSpan={1}>
                 Airspace* Tobacco Case/Bale
               </td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(1, "airspace")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(2, "airspace")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(3, "airspace")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(4, "airspace")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(5, "airspace")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(6, "airspace")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(7, "airspace")}</td>
-              <td className="border border-black p-0.5 bg-slate-50 font-bold">
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(1, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(2, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(3, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(4, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(5, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(6, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(7, "airspace")}</td>
+              <td className="border border-black py-1 px-0.5 bg-slate-50 font-bold align-middle leading-normal">
                 {wo.clearanceGasPpm != null ? wo.clearanceGasPpm : "0.01"}
               </td>
             </tr>
             <tr>
-              <td className="border border-black p-1 text-left font-bold" colSpan={2}>
+              <td className="border border-black py-1 px-1 text-left font-bold align-middle leading-normal" colSpan={2}>
                 Aeration Phosphine conc. (ppm) — Airspace (surrounding) Tobacco Case/Bale (until 0.1ppm)
               </td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(1, "probeCase")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(2, "probeCase")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(3, "probeCase")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(4, "probeCase")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(5, "probeCase")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(6, "probeCase")}</td>
-              <td className="border border-black p-0.5 font-bold">{cellReading(7, "probeCase")}</td>
-              <td className="border border-black p-0.5 bg-slate-50 font-bold">
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(1, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(2, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(3, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(4, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(5, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(6, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 font-bold align-middle leading-normal">{cellReading(7, "probeCase")}</td>
+              <td className="border border-black py-1 px-0.5 bg-slate-50 font-bold align-middle leading-normal">
                 {wo.clearanceGasPpm != null ? wo.clearanceGasPpm : "0.01"}
               </td>
             </tr>
@@ -497,7 +521,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
 
       {/* ── SECTION 5: SIGNATURES (Strictly on 1 page!) ── */}
       <div className="border-2 border-black p-2 bg-white">
-        <h2 className="text-[10px] font-black underline mb-0.5">Signatures:</h2>
+        <h2 className="text-[10px] font-black inline-block border-b border-black pb-0.5 mb-0.5">
+          Signatures:
+        </h2>
         <p className="text-[7.5px] text-gray-800 mb-2">
           (Attesting the information above is correct, that the fumigation practices adhered to the consignees instructions and that all fumigant residues were removed from the consignment).
         </p>
@@ -508,9 +534,11 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             {/* Name row */}
             <div className="flex items-end gap-2">
               <span className="font-bold whitespace-nowrap text-[8px]">Supervising Fumigator:</span>
-              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
-                {sigFum?.signerName || "Prince Chiwalo"}
-              </span>
+              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
+                <span className="font-bold text-[8px] leading-tight">
+                  {sigFum?.signerName || "Prince Chiwalo"}
+                </span>
+              </div>
             </div>
             {/* Signature row — dedicated height for sig image */}
             <div className="flex items-end gap-2">
@@ -529,9 +557,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             {/* Date row — its own line, no crowding */}
             <div className="flex items-end gap-2">
               <span className="font-bold whitespace-nowrap text-[8px]">Date:</span>
-              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
-                {certDate}
-              </span>
+              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
+                <span className="font-bold text-[8px] leading-tight">{certDate}</span>
+              </div>
             </div>
           </div>
 
@@ -540,9 +568,11 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             {/* Name row */}
             <div className="flex items-end gap-2">
               <span className="font-bold whitespace-nowrap text-[8px]">For the Supplier:</span>
-              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
-                {sigSup?.signerName || "—"}
-              </span>
+              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
+                <span className="font-bold text-[8px] leading-tight">
+                  {sigSup?.signerName || "—"}
+                </span>
+              </div>
             </div>
             {/* Signature row */}
             <div className="flex items-end gap-2">
@@ -552,9 +582,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             {/* Date row */}
             <div className="flex items-end gap-2">
               <span className="font-bold whitespace-nowrap text-[8px]">Date:</span>
-              <span className="border-b border-black flex-1 pb-0.5 font-bold text-[8px] px-1">
-                {certDate}
-              </span>
+              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
+                <span className="font-bold text-[8px] leading-tight">{certDate}</span>
+              </div>
             </div>
           </div>
 

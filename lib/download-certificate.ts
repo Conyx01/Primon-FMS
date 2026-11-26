@@ -42,10 +42,15 @@ export async function downloadCertificatePdf(element: HTMLElement, filename: str
     backgroundColor: "#ffffff",
     logging: false,
     imageTimeout: 4000,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: element.ownerDocument.defaultView?.innerWidth || element.offsetWidth,
+    windowHeight: element.ownerDocument.defaultView?.innerHeight || element.offsetHeight,
     onclone(_doc, cloned) {
       cloned.style.boxShadow = "none";
       cloned.style.transform = "none";
       cloned.style.margin = "0";
+      cloned.style.fontFeatureSettings = '"tnum"';
     },
   });
 
