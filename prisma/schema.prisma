@@ -231,6 +231,10 @@ model ShippingInstructions {
   containerNo            String?
   sealNo                 String?
   additionalInfo         String?
+  certificateTemplate    String?   @default("standard")
+  cigaretteBeetle        String?   @default("N/A")
+  tobaccoMoth            String?   @default("N/A")
+  wetDeactivated         Boolean?  @default(true)
   location               String?
   warehouseSection       String?
   lockedAt               DateTime?

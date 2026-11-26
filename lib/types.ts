@@ -30,6 +30,10 @@ export interface ShippingInstructions {
   containerNo?: string;
   sealNo?: string;
   additionalInfo?: string;
+  certificateTemplate?: "standard" | "pmi";
+  cigaretteBeetle?: "Yes" | "No" | "N/A";
+  tobaccoMoth?: "Yes" | "No" | "N/A";
+  wetDeactivated?: boolean;
   location: string;
   warehouseSection: string;
   complete: boolean;

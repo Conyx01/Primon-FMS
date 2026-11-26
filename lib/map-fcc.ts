@@ -39,6 +39,10 @@ type ApiFcc = {
     containerNo?: string | null;
     sealNo?: string | null;
     additionalInfo?: string | null;
+    certificateTemplate?: string | null;
+    cigaretteBeetle?: string | null;
+    tobaccoMoth?: string | null;
+    wetDeactivated?: boolean | null;
     location: string | null;
     warehouseSection: string | null;
     lockedAt?: string | null;
@@ -101,6 +105,10 @@ function emptySi(): ShippingInstructions {
     containerNo: "",
     sealNo: "",
     additionalInfo: "",
+    certificateTemplate: "standard",
+    cigaretteBeetle: "N/A",
+    tobaccoMoth: "N/A",
+    wetDeactivated: true,
     location: "",
     warehouseSection: "",
     complete: false,
@@ -130,6 +138,10 @@ export function mapFccToWorkOrder(fcc: ApiFcc): WorkOrder {
         containerNo: siRow.containerNo ?? "",
         sealNo: siRow.sealNo ?? "",
         additionalInfo: siRow.additionalInfo ?? "",
+        certificateTemplate: (siRow.certificateTemplate as "standard" | "pmi") ?? "standard",
+        cigaretteBeetle: (siRow.cigaretteBeetle as "Yes" | "No" | "N/A") ?? "N/A",
+        tobaccoMoth: (siRow.tobaccoMoth as "Yes" | "No" | "N/A") ?? "N/A",
+        wetDeactivated: siRow.wetDeactivated ?? true,
         location: siRow.location ?? "",
         warehouseSection: siRow.warehouseSection ?? "",
         complete: Boolean(siRow.tobaccoSupplier && siRow.consignee),

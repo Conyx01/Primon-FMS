@@ -73,6 +73,10 @@ export async function PATCH(
       containerNo,
       sealNo,
       additionalInfo,
+      certificateTemplate,
+      cigaretteBeetle,
+      tobaccoMoth,
+      wetDeactivated,
       location,
       warehouseSection,
     } = body;
@@ -124,6 +128,10 @@ export async function PATCH(
       ...(containerNo !== undefined && { containerNo: containerNo?.trim() || null }),
       ...(sealNo !== undefined && { sealNo: sealNo?.trim() || null }),
       ...(additionalInfo !== undefined && { additionalInfo: additionalInfo?.trim() || null }),
+      ...(certificateTemplate !== undefined && { certificateTemplate: certificateTemplate?.trim() || "standard" }),
+      ...(cigaretteBeetle !== undefined && { cigaretteBeetle: cigaretteBeetle?.trim() || "N/A" }),
+      ...(tobaccoMoth !== undefined && { tobaccoMoth: tobaccoMoth?.trim() || "N/A" }),
+      ...(wetDeactivated !== undefined && { wetDeactivated: typeof wetDeactivated === "boolean" ? wetDeactivated : String(wetDeactivated).toLowerCase() === "true" || String(wetDeactivated).toLowerCase() === "yes" }),
       ...(location !== undefined && { location: location?.trim() || null }),
       ...(warehouseSection !== undefined && { warehouseSection: warehouseSection?.trim() || null }),
     };

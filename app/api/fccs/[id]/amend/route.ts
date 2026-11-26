@@ -79,6 +79,10 @@ export async function POST(
       containerNo,
       sealNo,
       additionalInfo,
+      certificateTemplate,
+      cigaretteBeetle,
+      tobaccoMoth,
+      wetDeactivated,
       // Signatory names
       signers,
     } = body;
@@ -213,6 +217,11 @@ export async function POST(
     checkSiField("containerNo", existingSi?.containerNo, containerNo?.trim());
     checkSiField("sealNo", existingSi?.sealNo, sealNo?.trim());
     checkSiField("additionalInfo", existingSi?.additionalInfo, additionalInfo !== undefined ? (additionalInfo?.trim() || null) : undefined);
+    checkSiField("certificateTemplate", existingSi?.certificateTemplate, certificateTemplate?.trim());
+    checkSiField("cigaretteBeetle", existingSi?.cigaretteBeetle, cigaretteBeetle?.trim());
+    checkSiField("tobaccoMoth", existingSi?.tobaccoMoth, tobaccoMoth?.trim());
+    const parsedWetDeactivated = wetDeactivated !== undefined ? (typeof wetDeactivated === "boolean" ? wetDeactivated : String(wetDeactivated).toLowerCase() === "true" || String(wetDeactivated).toLowerCase() === "yes") : undefined;
+    checkSiField("wetDeactivated", existingSi?.wetDeactivated, parsedWetDeactivated);
 
     // Run transaction
     const result = await prisma.$transaction(async (tx) => {

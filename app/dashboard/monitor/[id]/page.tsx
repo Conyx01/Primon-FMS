@@ -82,6 +82,10 @@ type FccPayload = {
     containerNo?: string | null;
     sealNo?: string | null;
     additionalInfo?: string | null;
+    certificateTemplate?: string | null;
+    cigaretteBeetle?: string | null;
+    tobaccoMoth?: string | null;
+    wetDeactivated?: boolean | null;
     location: string | null;
     warehouseSection: string | null;
     lockedAt?: string | null;

@@ -21,6 +21,11 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const isPmi =
+    si.certificateTemplate === "pmi" ||
+    /philip\s*morris|pmi/i.test(si.consignee || "") ||
+    /philip\s*morris|pmi/i.test(si.consigneeAddress || "");
+
   const hasExistingSi = Boolean(
     initial.tobaccoSupplier?.trim() || initial.consignee?.trim() || initial.complete
   );
@@ -52,6 +57,10 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
           containerNo: si.containerNo,
           sealNo: si.sealNo,
           additionalInfo: si.additionalInfo,
+          certificateTemplate: si.certificateTemplate || (isPmi ? "pmi" : "standard"),
+          cigaretteBeetle: si.cigaretteBeetle || "N/A",
+          tobaccoMoth: si.tobaccoMoth || "N/A",
+          wetDeactivated: si.wetDeactivated !== false,
           location: si.location,
           warehouseSection: si.warehouseSection,
         }),
@@ -242,6 +251,81 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved }: Prop
           </div>
         )}
       </div>
+
+
+      {/* ── PMI Compliance & Infestation Details (Only visible for PMI or when selected) ── */}
+      {isPmi ? (
+        <div className="mt-5 rounded-lg border border-brass-200 bg-primon-50/50 p-4 space-y-4 animate-reveal-up">
+          <div className="flex items-center justify-between border-b border-brass-200 pb-2">
+            <div>
+              <p className="text-xs font-bold text-primon-950 uppercase tracking-wide">
+                PMI Compliance & Infestation Declaration (PME Method #751)
+              </p>
+              <p className="text-[11px] text-muted">
+                Required proprietary declaration for Philip Morris International destinations.
+              </p>
+            </div>
+            <span className="rounded bg-brass-100 px-2 py-0.5 text-[10px] font-bold text-brass-800">
+              PMI Method #751
+            </span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <FormRow label="Cigarette Beetle">
+              <Select
+                value={si.cigaretteBeetle ?? "N/A"}
+                disabled={locked}
+                onChange={(e) =>
+                  setSi({ ...si, cigaretteBeetle: e.target.value as "Yes" | "No" | "N/A" })
+                }
+              >
+                <option value="N/A">N/A (Standard / Uninfested)</option>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </Select>
+            </FormRow>
+
+            <FormRow label="Tobacco Moth">
+              <Select
+                value={si.tobaccoMoth ?? "N/A"}
+                disabled={locked}
+                onChange={(e) =>
+                  setSi({ ...si, tobaccoMoth: e.target.value as "Yes" | "No" | "N/A" })
+                }
+              >
+                <option value="N/A">N/A (Standard / Uninfested)</option>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </Select>
+            </FormRow>
+
+            <FormRow label="Fumigant Wet Deactivated">
+              <Select
+                value={si.wetDeactivated !== false ? "Yes" : "No"}
+                disabled={locked}
+                onChange={(e) =>
+                  setSi({ ...si, wetDeactivated: e.target.value === "Yes" })
+                }
+              >
+                <option value="Yes">Yes (Residue Deactivated)</option>
+                <option value="No">No</option>
+              </Select>
+            </FormRow>
+          </div>
+        </div>
+      ) : (
+        !locked && (
+          <div className="mt-4 border-t border-dashed border-border pt-3">
+            <button
+              type="button"
+              onClick={() => setSi({ ...si, certificateTemplate: "pmi" })}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brass-700 hover:text-brass-900"
+            >
+              + Designate as PMI Destined Tobacco (PME Method #751)
+            </button>
+          </div>
+        )
+      )}
 
       {error && <p className="mt-4 text-xs text-status-critical">{error}</p>}
       {saved && !error && (

@@ -1,5 +1,12 @@
-export function certificateFilename(certificateNumber?: string, workOrderCode?: string) {
+export function certificateFilename(
+  certificateNumber?: string,
+  workOrderCode?: string,
+  variant?: string
+) {
   const id = (certificateNumber || workOrderCode || "certificate").replace(/[^\w.-]+/g, "-");
+  if (variant === "pmi_crest") return `PMI-Crest-${id}.pdf`;
+  if (variant === "primon_logo") return `Primon-PMI-${id}.pdf`;
+  if (variant) return `Primon-${variant}-${id}.pdf`;
   return `Primon-${id}.pdf`;
 }
 
