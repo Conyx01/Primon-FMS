@@ -127,7 +127,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             <div className="absolute right-0 top-0 flex items-center justify-end h-16 w-32">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/pmi-logo.svg"
+                src="/pmi-logo.webp"
                 alt="Philip Morris International"
                 className="h-12 w-auto object-contain"
               />
@@ -140,7 +140,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             <img
               src="/logo-no-bg.png"
               alt="Primon Enterprises Limited"
-              className="h-14 w-auto object-contain"
+              className="h-20 w-auto object-contain"
             />
             <div className="mt-1 text-[10px] font-bold">
               <span>CERTIFICATE NO. &nbsp;</span>
