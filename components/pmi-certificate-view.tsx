@@ -494,9 +494,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           (Attesting the information above is correct, that the fumigation practices adhered to the consignees instructions and that all fumigant residues were removed from the consignment).
         </p>
 
-        <div className="grid grid-cols-2 gap-x-8 pt-1">
+        <div className="flex items-center justify-between gap-6 pt-1">
           {/* Supervising Fumigator */}
-          <div className="space-y-1">
+          <div className="flex-1 space-y-1">
             <div className="flex items-end gap-2">
               <span className="font-bold whitespace-nowrap">Supervising Fumigator: Name:</span>
               <span className="border-b border-black font-bold flex-1 px-1">
@@ -521,7 +521,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           </div>
 
           {/* For the Supplier */}
-          <div className="space-y-1">
+          <div className="flex-1 space-y-1">
             <div className="flex items-end gap-2">
               <span className="font-bold whitespace-nowrap">For the Supplier: Name:</span>
               <span className="border-b border-black font-bold flex-1 px-1">
@@ -535,6 +535,23 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
               <span className="border-b border-black font-bold px-2">{certDate}</span>
             </div>
           </div>
+
+          {/* Verification QR Code (Minted & displayed upon certification) */}
+          {certified && wo.verificationUrl && (
+            <div className="flex flex-col items-center justify-center shrink-0 pl-3 border-l-2 border-black">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(wo.verificationUrl)}`}
+                alt="Verification QR"
+                width={65}
+                height={65}
+                className="rounded border border-black"
+              />
+              <span className="text-[7px] font-extrabold text-black text-center mt-0.5 tracking-tight">
+                Scan to verify
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </article>
