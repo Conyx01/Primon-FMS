@@ -25,27 +25,9 @@ function val(v: number | null | undefined): string {
 }
 
 function Checkmark({ checked }: { checked: boolean }) {
-  return checked ? (
-    <span className="inline-block border-b-2 border-black font-black pb-[1px] px-0.5 leading-none mx-1 text-center min-w-[14px]">
-      X
-    </span>
-  ) : (
-    <span className="inline-block w-4 border-b border-black text-center mx-1">&nbsp;</span>
-  );
-}
-
-function UnderlineVal({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
   return (
-    <span
-      className={`inline-block border-b border-black font-bold pb-[1px] px-1 leading-none ${className}`}
-    >
-      {children}
+    <span className="inline-flex items-center justify-center font-bold font-mono text-[8.5px] mx-1">
+      [{checked ? "X" : "\u00A0\u00A0"}]
     </span>
   );
 }
@@ -137,7 +119,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
               </p>
               <div className="mt-2 text-[10px] font-bold">
                 <span>CERTIFICATE NO. &nbsp;</span>
-                <span className="inline-block border-b-2 border-black px-3 pb-0.5 tracking-wider font-extrabold">
+                <span className="inline-block border border-black px-2.5 py-0.5 tracking-wider font-mono font-black">
                   {certNumberDisplay}
                 </span>
               </div>
@@ -162,7 +144,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             />
             <div className="mt-1 text-[10px] font-bold">
               <span>CERTIFICATE NO. &nbsp;</span>
-              <span className="inline-block border-b-2 border-black px-3 pb-0.5 tracking-wider font-extrabold">
+              <span className="inline-block border border-black px-2.5 py-0.5 tracking-wider font-mono font-black">
                 {certNumberDisplay}
               </span>
             </div>
@@ -297,16 +279,16 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           <span className="font-bold">
             Tobacco temperature (Centre of case/bale) recorded prior fumigation: &nbsp;
           </span>
-          <UnderlineVal>
+          <span className="font-extrabold text-black">
             {day0ProductTemp != null ? day0ProductTemp : "—"}
-          </UnderlineVal>
+          </span>
           <span className="font-bold"> &nbsp;°C</span>
         </div>
       </div>
 
       {/* ── SECTION 3: FUMIGATION DESCRIPTION ── */}
       <div className="border-2 border-black p-2 mb-2 space-y-1">
-        <h2 className="text-[10px] font-black inline-block border-b border-black pb-0.5">
+        <h2 className="text-[10px] font-black uppercase tracking-wide inline-block border-b border-black pb-0.5">
           Fumigation Description
         </h2>
         <div>
@@ -337,26 +319,26 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
         <div className="flex flex-wrap gap-x-6">
           <div>
             <span className="font-bold">Total Volume Fumigated (m³): </span>
-            <UnderlineVal>{val(fum.totalVolume)}</UnderlineVal>
+            <span className="font-extrabold text-black">{val(fum.totalVolume)}</span>
           </div>
           <div>
             <span className="font-bold">Dose PH3(g/m³): </span>
-            <UnderlineVal>{val(fum.dose)}</UnderlineVal>
+            <span className="font-extrabold text-black">{val(fum.dose)}</span>
           </div>
           <div>
             <span className="font-bold">Total Fumigant used (g): </span>
-            <UnderlineVal>{val(fum.totalFumigantUsed)}</UnderlineVal>
+            <span className="font-extrabold text-black">{val(fum.totalFumigantUsed)}</span>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-x-8">
           <div>
             <span className="font-bold">Total hours under gas: </span>
-            <UnderlineVal>144</UnderlineVal>
+            <span className="font-extrabold text-black">144</span>
           </div>
           <div>
             <span className="font-bold">Total Hours of Aeration: </span>
-            <UnderlineVal>{wo.durationHours != null ? wo.durationHours : "48"}</UnderlineVal>
+            <span className="font-extrabold text-black">{wo.durationHours != null ? wo.durationHours : "48"}</span>
           </div>
           <div>
             <span className="font-bold">Fumigant wet deactivated: &nbsp;</span>
@@ -368,15 +350,15 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
         <div className="flex flex-wrap gap-x-4">
           <div>
             <span className="font-bold">Dates/Times: Fumigant placed: </span>
-            <UnderlineVal>{fmt(wo.datePlaced)}</UnderlineVal>
+            <span className="font-extrabold text-black">{fmt(wo.datePlaced)}</span>
           </div>
           <div>
             <span className="font-bold">Aeration begun: </span>
-            <UnderlineVal>{fmt(wo.aerationBegan)}</UnderlineVal>
+            <span className="font-extrabold text-black">{fmt(wo.aerationBegan)}</span>
           </div>
           <div>
             <span className="font-bold">Aeration completed: </span>
-            <UnderlineVal>{fmt(wo.aerationCompleted)}</UnderlineVal>
+            <span className="font-extrabold text-black">{fmt(wo.aerationCompleted)}</span>
           </div>
         </div>
 
@@ -384,9 +366,9 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           <span className="font-bold">
             Minimum ambient (surrounding) temperature recorded during fumigation: &nbsp;
           </span>
-          <UnderlineVal>
+          <span className="font-extrabold text-black">
             {minAmbientTemp != null ? minAmbientTemp : "—"}
-          </UnderlineVal>
+          </span>
           <span className="font-bold"> &nbsp;°C</span>
         </div>
       </div>
@@ -528,63 +510,61 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           (Attesting the information above is correct, that the fumigation practices adhered to the consignees instructions and that all fumigant residues were removed from the consignment).
         </p>
 
-        <div className="flex items-stretch justify-between gap-6 pt-1">
+        <div className="flex items-start justify-between gap-6 pt-1">
           {/* Supervising Fumigator */}
           <div className="flex-1 space-y-2">
-            {/* Name row */}
-            <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap text-[8px]">Supervising Fumigator:</span>
-              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
-                <span className="font-bold text-[8px] leading-tight">
-                  {sigFum?.signerName || "Prince Chiwalo"}
-                </span>
+            <div>
+              <div className="flex items-baseline justify-between text-[8px] font-bold">
+                <span>Supervising Fumigator Name:</span>
+                <span className="text-black font-extrabold text-[8.5px]">{sigFum?.signerName || "Prince Chiwalo"}</span>
               </div>
+              <div className="border-b border-black w-full mt-0.5" />
             </div>
-            {/* Signature row — dedicated height for sig image */}
-            <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap text-[8px]">Signature:</span>
-              <div className="relative border-b border-black flex-1 h-9">
+
+            <div>
+              <span className="text-[8px] font-bold block mb-0.5">Signature:</span>
+              <div className="relative h-10 w-full border-b border-black">
                 {showPrinceSignature && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src="/signature.png"
                     alt="Signature"
-                    className="absolute bottom-0.5 left-2 h-8 w-auto object-contain"
+                    className="absolute bottom-1 left-2 h-9 w-auto object-contain"
                   />
                 )}
               </div>
             </div>
-            {/* Date row — its own line, no crowding */}
-            <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap text-[8px]">Date:</span>
-              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
-                <span className="font-bold text-[8px] leading-tight">{certDate}</span>
+
+            <div>
+              <div className="flex items-baseline justify-between text-[8px] font-bold">
+                <span>Date:</span>
+                <span className="text-black font-extrabold text-[8.5px]">{certDate}</span>
               </div>
+              <div className="border-b border-black w-full mt-0.5" />
             </div>
           </div>
 
           {/* For the Supplier */}
           <div className="flex-1 space-y-2">
-            {/* Name row */}
-            <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap text-[8px]">For the Supplier:</span>
-              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
-                <span className="font-bold text-[8px] leading-tight">
-                  {sigSup?.signerName || "—"}
-                </span>
+            <div>
+              <div className="flex items-baseline justify-between text-[8px] font-bold">
+                <span>For the Supplier Name:</span>
+                <span className="text-black font-extrabold text-[8.5px]">{sigSup?.signerName || "—"}</span>
               </div>
+              <div className="border-b border-black w-full mt-0.5" />
             </div>
-            {/* Signature row */}
-            <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap text-[8px]">Signature:</span>
-              <div className="border-b border-black flex-1 h-9"></div>
+
+            <div>
+              <span className="text-[8px] font-bold block mb-0.5">Signature:</span>
+              <div className="h-10 w-full border-b border-black" />
             </div>
-            {/* Date row */}
-            <div className="flex items-end gap-2">
-              <span className="font-bold whitespace-nowrap text-[8px]">Date:</span>
-              <div className="flex-1 border-b border-black pb-0.5 px-1 min-h-[16px] flex items-end">
-                <span className="font-bold text-[8px] leading-tight">{certDate}</span>
+
+            <div>
+              <div className="flex items-baseline justify-between text-[8px] font-bold">
+                <span>Date:</span>
+                <span className="text-black font-extrabold text-[8.5px]">{certDate}</span>
               </div>
+              <div className="border-b border-black w-full mt-0.5" />
             </div>
           </div>
 
