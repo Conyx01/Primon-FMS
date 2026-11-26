@@ -119,7 +119,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
               </p>
               <div className="mt-2 text-[10px] font-bold">
                 <span>CERTIFICATE NO. &nbsp;</span>
-                <span className="inline-block border border-black px-2.5 py-0.5 tracking-wider font-mono font-black">
+                <span className="font-mono font-black text-black tracking-wider text-[11px]">
                   {certNumberDisplay}
                 </span>
               </div>
@@ -144,7 +144,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             />
             <div className="mt-1 text-[10px] font-bold">
               <span>CERTIFICATE NO. &nbsp;</span>
-              <span className="inline-block border border-black px-2.5 py-0.5 tracking-wider font-mono font-black">
+              <span className="font-mono font-black text-black tracking-wider text-[11px]">
                 {certNumberDisplay}
               </span>
             </div>
@@ -178,7 +178,7 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           </tr>
           <tr>
             <td className="border border-black p-1 text-center font-bold">GRADE</td>
-            <td className="border border-black p-1 text-center font-bold">{si.gradeName || "—"}</td>
+            <td className="border border-black p-1.5 text-left font-bold">{si.gradeName || "—"}</td>
             <td className="border border-black p-1 text-center font-medium">
               {si.consigneeAddress ? "203403" : "—"}
             </td>
@@ -510,61 +510,71 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           (Attesting the information above is correct, that the fumigation practices adhered to the consignees instructions and that all fumigant residues were removed from the consignment).
         </p>
 
-        <div className="flex items-start justify-between gap-6 pt-1">
+        <div className="flex items-start justify-between gap-8 pt-1">
           {/* Supervising Fumigator */}
-          <div className="flex-1 space-y-2">
-            <div>
-              <div className="flex items-baseline justify-between text-[8px] font-bold">
-                <span>Supervising Fumigator Name:</span>
-                <span className="text-black font-extrabold text-[8.5px]">{sigFum?.signerName || "Prince Chiwalo"}</span>
-              </div>
-              <div className="border-b border-black w-full mt-0.5" />
+          <div className="flex-1 text-[8.5px]">
+            <span className="font-extrabold uppercase tracking-wide text-gray-900 block">
+              Supervising Fumigator
+            </span>
+            <div className="relative mt-1 h-12 border-b-2 border-black">
+              {showPrinceSignature && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/signature.png"
+                  alt="Signature"
+                  className="absolute bottom-0 left-0 h-11 w-auto max-w-[160px] object-contain object-left"
+                />
+              )}
+            </div>
+            <span className="mt-0.5 text-[7.5px] font-bold uppercase tracking-wider text-gray-700 block">
+              Signature
+            </span>
+
+            <div className="mt-2.5">
+              <span className="font-extrabold text-black block text-[9px]">
+                {sigFum?.signerName || "Prince Chiwalo"}
+              </span>
+              <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-700 block">
+                Printed Name
+              </span>
             </div>
 
-            <div>
-              <span className="text-[8px] font-bold block mb-0.5">Signature:</span>
-              <div className="relative h-10 w-full border-b border-black">
-                {showPrinceSignature && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src="/signature.png"
-                    alt="Signature"
-                    className="absolute bottom-1 left-2 h-9 w-auto object-contain"
-                  />
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-baseline justify-between text-[8px] font-bold">
-                <span>Date:</span>
-                <span className="text-black font-extrabold text-[8.5px]">{certDate}</span>
-              </div>
-              <div className="border-b border-black w-full mt-0.5" />
+            <div className="mt-2">
+              <span className="font-bold text-black block text-[8.5px]">
+                {certDate}
+              </span>
+              <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-700 block">
+                Date
+              </span>
             </div>
           </div>
 
           {/* For the Supplier */}
-          <div className="flex-1 space-y-2">
-            <div>
-              <div className="flex items-baseline justify-between text-[8px] font-bold">
-                <span>For the Supplier Name:</span>
-                <span className="text-black font-extrabold text-[8.5px]">{sigSup?.signerName || "—"}</span>
-              </div>
-              <div className="border-b border-black w-full mt-0.5" />
+          <div className="flex-1 text-[8.5px]">
+            <span className="font-extrabold uppercase tracking-wide text-gray-900 block">
+              For the Supplier
+            </span>
+            <div className="relative mt-1 h-12 border-b-2 border-black"></div>
+            <span className="mt-0.5 text-[7.5px] font-bold uppercase tracking-wider text-gray-700 block">
+              Signature
+            </span>
+
+            <div className="mt-2.5">
+              <span className="font-extrabold text-black block text-[9px]">
+                {sigSup?.signerName || "—"}
+              </span>
+              <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-700 block">
+                Printed Name
+              </span>
             </div>
 
-            <div>
-              <span className="text-[8px] font-bold block mb-0.5">Signature:</span>
-              <div className="h-10 w-full border-b border-black" />
-            </div>
-
-            <div>
-              <div className="flex items-baseline justify-between text-[8px] font-bold">
-                <span>Date:</span>
-                <span className="text-black font-extrabold text-[8.5px]">{certDate}</span>
-              </div>
-              <div className="border-b border-black w-full mt-0.5" />
+            <div className="mt-2">
+              <span className="font-bold text-black block text-[8.5px]">
+                {certDate}
+              </span>
+              <span className="text-[7.5px] font-bold uppercase tracking-wider text-gray-700 block">
+                Date
+              </span>
             </div>
           </div>
 
