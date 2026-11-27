@@ -77,6 +77,11 @@ export async function PATCH(
       cigaretteBeetle,
       tobaccoMoth,
       wetDeactivated,
+      shippingGrade,
+      shippingGradeNo,
+      htsNo,
+      pmiPoNo,
+      pmiRefNo,
       location,
       warehouseSection,
     } = body;
@@ -132,6 +137,11 @@ export async function PATCH(
       ...(cigaretteBeetle !== undefined && { cigaretteBeetle: cigaretteBeetle?.trim() || "N/A" }),
       ...(tobaccoMoth !== undefined && { tobaccoMoth: tobaccoMoth?.trim() || "N/A" }),
       ...(wetDeactivated !== undefined && { wetDeactivated: typeof wetDeactivated === "boolean" ? wetDeactivated : String(wetDeactivated).toLowerCase() === "true" || String(wetDeactivated).toLowerCase() === "yes" }),
+      ...(shippingGrade !== undefined && { shippingGrade: shippingGrade?.trim() || null }),
+      ...(shippingGradeNo !== undefined && { shippingGradeNo: shippingGradeNo?.trim() || null }),
+      ...(htsNo !== undefined && { htsNo: htsNo?.trim() || null }),
+      ...(pmiPoNo !== undefined && { pmiPoNo: pmiPoNo?.trim() || null }),
+      ...(pmiRefNo !== undefined && { pmiRefNo: pmiRefNo?.trim() || null }),
       ...(location !== undefined && { location: location?.trim() || null }),
       ...(warehouseSection !== undefined && { warehouseSection: warehouseSection?.trim() || null }),
     };

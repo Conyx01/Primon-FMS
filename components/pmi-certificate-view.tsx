@@ -178,9 +178,11 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
           </tr>
           <tr>
             <td className="border border-black p-1 text-center font-bold">GRADE</td>
-            <td className="border border-black p-1.5 text-left font-bold">{si.gradeName || "—"}</td>
+            <td className="border border-black p-1.5 text-left font-bold">
+              {si.shippingGrade || si.gradeName || "—"}
+            </td>
             <td className="border border-black p-1 text-center font-medium">
-              {si.consigneeAddress ? "203403" : "—"}
+              {si.shippingGradeNo || (si.consigneeAddress ? "205590" : "—")}
             </td>
           </tr>
           <tr>
@@ -250,10 +252,10 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
             </div>
           </div>
 
-          {/* Right Checklist: Infested with */}
-          <div className="border-l-2 border-black pl-4 flex flex-col justify-center min-w-[210px]">
+          {/* Right Checklist: Infested with + PMI Identifiers */}
+          <div className="border-l-2 border-black pl-4 flex flex-col justify-center min-w-[210px] text-[8px]">
             <span className="font-bold block mb-0.5">Infested with:</span>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <div>
                 <span>Cigarette beetle: </span>
                 <span>
@@ -269,6 +271,22 @@ export const PmiCertificateView = forwardRef<HTMLElement, Props>(function PmiCer
                   No <Checkmark checked={tobaccoMoth === "No"} />
                   N/A <Checkmark checked={tobaccoMoth === "N/A"} />
                 </span>
+              </div>
+            </div>
+
+            {/* PMI Identification Codes */}
+            <div className="mt-1 pt-1 border-t border-gray-300 space-y-0.5 text-[8px]">
+              <div>
+                <span className="font-bold">HTS No. </span>
+                <span className="font-semibold text-black">{si.htsNo || "—"}</span>
+              </div>
+              <div>
+                <span className="font-bold">Purchase Order No. </span>
+                <span className="font-semibold text-black">{si.pmiPoNo || "—"}</span>
+              </div>
+              <div>
+                <span className="font-bold">Reference No. </span>
+                <span className="font-semibold text-black">{si.pmiRefNo || "—"}</span>
               </div>
             </div>
           </div>

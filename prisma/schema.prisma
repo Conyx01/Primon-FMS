@@ -235,6 +235,11 @@ model ShippingInstructions {
   cigaretteBeetle        String?   @default("N/A")
   tobaccoMoth            String?   @default("N/A")
   wetDeactivated         Boolean?  @default(true)
+  shippingGrade          String?
+  shippingGradeNo        String?
+  htsNo                  String?
+  pmiPoNo                String?
+  pmiRefNo               String?
   location               String?
   warehouseSection       String?
   lockedAt               DateTime?

@@ -65,6 +65,11 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved, isInte
           cigaretteBeetle: si.cigaretteBeetle || "N/A",
           tobaccoMoth: si.tobaccoMoth || "N/A",
           wetDeactivated: si.wetDeactivated !== false,
+          shippingGrade: si.shippingGrade,
+          shippingGradeNo: si.shippingGradeNo,
+          htsNo: si.htsNo,
+          pmiPoNo: si.pmiPoNo,
+          pmiRefNo: si.pmiRefNo,
           location: si.location,
           warehouseSection: si.warehouseSection,
         }),
@@ -314,6 +319,57 @@ export function ShippingInstructionsForm({ workOrderId, initial, onSaved, isInte
                 <option value="Yes">Yes (Residue Deactivated)</option>
                 <option value="No">No</option>
               </Select>
+            </FormRow>
+          </div>
+
+          {/* PMI Grades (Table 1) */}
+          <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-brass-200">
+            <FormRow label="Shipping Grade (Table 1)">
+              <TextInput
+                placeholder="e.g. 7S26103"
+                value={si.shippingGrade ?? ""}
+                disabled={locked}
+                onChange={(e) => setSi({ ...si, shippingGrade: e.target.value })}
+              />
+            </FormRow>
+
+            <FormRow label="Shipping Grade Number (Table 1)">
+              <TextInput
+                placeholder="e.g. 205590"
+                value={si.shippingGradeNo ?? ""}
+                disabled={locked}
+                onChange={(e) => setSi({ ...si, shippingGradeNo: e.target.value })}
+              />
+            </FormRow>
+          </div>
+
+          {/* PMI Order Identifiers (Section 2) */}
+          <div className="grid gap-4 sm:grid-cols-3 pt-2 border-t border-brass-200">
+            <FormRow label="HTS No.">
+              <TextInput
+                placeholder="e.g. 2401.20.8520"
+                value={si.htsNo ?? ""}
+                disabled={locked}
+                onChange={(e) => setSi({ ...si, htsNo: e.target.value })}
+              />
+            </FormRow>
+
+            <FormRow label="Purchase Order No.">
+              <TextInput
+                placeholder="e.g. 4900001210"
+                value={si.pmiPoNo ?? ""}
+                disabled={locked}
+                onChange={(e) => setSi({ ...si, pmiPoNo: e.target.value })}
+              />
+            </FormRow>
+
+            <FormRow label="Reference No.">
+              <TextInput
+                placeholder="e.g. 26-302"
+                value={si.pmiRefNo ?? ""}
+                disabled={locked}
+                onChange={(e) => setSi({ ...si, pmiRefNo: e.target.value })}
+              />
             </FormRow>
           </div>
         </div>
